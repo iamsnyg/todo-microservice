@@ -1,0 +1,14 @@
+node_modules
+
+.env
+
+generated/
+
+coverage/
+/src/generated/prisma
+<<<<<<< HEAD
+=======
+
+
+auth_backup.sql
+>>>>>>> 616da95 (Add Todo microservices DevOps configuration)

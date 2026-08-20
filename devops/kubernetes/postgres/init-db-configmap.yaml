@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: postgres-init
+  namespace: todo-app
+
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: todo-microservices
+
+data:
+  init-db.sh: |
+    #!/bin/bash
+
+    set -e
+
+    echo "Creating application databases and users..."
+
+    psql \
+      -v ON_ERROR_STOP=1 \
+      --username "$POSTGRES_USER" \
+      --dbname "$POSTGRES_DB" \
+      --set=auth_password="$AUTH_DB_PASSWORD" \
+      --set=notification_password="$NOTIFICATION_DB_PASSWORD" <<'EOSQL'
+
+    CREATE USER auth_user WITH PASSWORD :'auth_password';
+
+    CREATE DATABASE auth_db OWNER auth_user;
+
+    CREATE USER notification_user WITH PASSWORD :'notification_password';
+
+    CREATE DATABASE notification_db OWNER notification_user;
+
+    EOSQL
+
+    echo "Application databases and users created successfully."

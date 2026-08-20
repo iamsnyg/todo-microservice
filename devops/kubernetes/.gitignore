@@ -1,0 +1,7 @@
+# Kubernetes secrets
+secrets/*.yaml
+!secrets/secret-template.yaml
+
+# Local/generated files
+*.secret.yaml
+*.local.yaml

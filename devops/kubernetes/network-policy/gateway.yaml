@@ -1,0 +1,69 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: gateway-network-policy
+  namespace: todo-app
+
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+
+    # Ingress Controller → Gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+
+      ports:
+        - protocol: TCP
+          port: 8000
+
+  egress:
+
+    # Gateway → Auth
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: auth-service
+
+      ports:
+        - protocol: TCP
+          port: 5000
+
+    # Gateway → Todo
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: todo-service
+
+      ports:
+        - protocol: TCP
+          port: 5001
+
+    # Gateway → Notification
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: notification-service
+
+      ports:
+        - protocol: TCP
+          port: 5002
+
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+
+        - protocol: TCP
+          port: 53

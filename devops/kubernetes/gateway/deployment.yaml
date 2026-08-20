@@ -1,0 +1,165 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: gateway
+  namespace: todo-app
+
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/component: api-gateway
+    app.kubernetes.io/part-of: todo-microservices
+
+spec:
+  replicas: 2
+
+  strategy:
+    type: RollingUpdate
+
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway
+        app.kubernetes.io/component: api-gateway
+        app.kubernetes.io/part-of: todo-microservices
+
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: gateway
+
+          image: docker-gateway:latest
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          env:
+
+            # ==========================================
+            # Application
+            # ==========================================
+
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: NODE_ENV
+
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: GATEWAY_PORT
+
+
+            # ==========================================
+            # Backend Services
+            # ==========================================
+
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: AUTH_SERVICE_URL
+
+            - name: TODO_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: TODO_SERVICE_URL
+
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: NOTIFICATION_SERVICE_URL
+
+
+            # ==========================================
+            # Gateway Secret
+            # ==========================================
+
+            - name: GATEWAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: todo-app-secrets
+                  key: GATEWAY_SECRET
+
+
+            # ==========================================
+            # Frontend URL
+            # ==========================================
+
+            - name: CLIENT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: todo-app-config
+                  key: CLIENT_URL
+
+
+          # ==========================================
+          # Resources
+          # ==========================================
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+
+          # ==========================================
+          # Readiness Probe
+          # ==========================================
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+
+          # ==========================================
+          # Liveness Probe
+          # ==========================================
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+
+          # ==========================================
+          # Security
+          # ==========================================
+
+          securityContext:
+            allowPrivilegeEscalation: false
+
+            capabilities:
+              drop:
+                - ALL

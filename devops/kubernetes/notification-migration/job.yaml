@@ -1,0 +1,86 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: notification-migration
+  namespace: todo-app
+
+  labels:
+    app.kubernetes.io/name: notification-migration
+    app.kubernetes.io/component: migration
+    app.kubernetes.io/part-of: todo-microservices
+
+spec:
+  backoffLimit: 4
+
+  ttlSecondsAfterFinished: 86400
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-migration
+        app.kubernetes.io/component: migration
+        app.kubernetes.io/part-of: todo-microservices
+
+    spec:
+      restartPolicy: OnFailure
+
+      initContainers:
+      - name: wait-for-notification-db
+        image: postgres:17-alpine
+
+        env:
+          - name: NOTIFICATION_DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: todo-app-secrets
+                key: NOTIFICATION_DATABASE_URL
+
+        command:
+          - sh
+          - -c
+          - |
+            until pg_isready -d "$NOTIFICATION_DATABASE_URL"; do
+              echo "Waiting for notification_db..."
+              sleep 2
+            done
+
+            echo "notification_db is ready."
+
+      containers:
+        - name: notification-migration
+
+          image: todo-notification-service:1.0.0
+
+          imagePullPolicy: IfNotPresent
+
+          command:
+            - npx
+
+          args:
+            - prisma
+            - migrate
+            - deploy
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: todo-app-secrets
+                  key: NOTIFICATION_DATABASE_URL
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+
+            capabilities:
+              drop:
+                - ALL
