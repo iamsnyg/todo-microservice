@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 
 import { useTodoStore } from "@/store/todo.store";
-
 import { Button } from "@/components/ui/button";
 
 import {
@@ -43,9 +42,6 @@ export default function CreateTodoDialog() {
         try {
             setSaving(true);
 
-<<<<<<< HEAD
-            const result = await createTodo(formData);
-=======
             const payload = {
                 title: formData.title.trim(),
                 description: formData.description.trim() || undefined,
@@ -59,27 +55,21 @@ export default function CreateTodoDialog() {
             console.log("Creating Todo:", payload);
 
             const result = await createTodo(payload);
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 
             if (result.success) {
                 setOpen(false);
                 setFormData(initialForm);
-<<<<<<< HEAD
-
-                // Replace with toast later
-                // toast.success("Todo created successfully");
             } else {
-                alert(result.message);
-            }
-=======
-            } else {
-                alert(result.message);
+                alert(result.message || "Failed to create todo.");
             }
         } catch (error) {
             console.error("Create Todo Error:", error);
 
-            alert(error.response?.data?.message || "Failed to create todo");
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
+            alert(
+                error?.response?.data?.message ||
+                    error?.message ||
+                    "Failed to create todo.",
+            );
         } finally {
             setSaving(false);
         }
