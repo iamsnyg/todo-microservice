@@ -107,7 +107,7 @@ services:
   # Auth Service
   # ==========================================
   auth-service:
-    image: todo-auth-service:1.0
+    image: todo-auth-service:1.0.0
     container_name: todo-auth-service
     restart: unless-stopped
 
@@ -179,7 +179,7 @@ services:
   # Todo Service
   # ==========================================
   todo-service:
-    image: todo-todo-service:1.0
+    image: todo-todo-service:1.0.0
     container_name: todo-todo-service
     restart: unless-stopped
 

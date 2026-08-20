@@ -8,10 +8,7 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-<<<<<<< HEAD
-=======
     "start": "node src/server.js",
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
