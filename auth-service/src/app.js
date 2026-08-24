@@ -33,11 +33,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(cookieParser());
 
-<<<<<<< HEAD
-console.log("SESSION_SECRET =", env.SESSION_SECRET);
-=======
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
-
 app.use(
     session({
         store: new RedisStore({

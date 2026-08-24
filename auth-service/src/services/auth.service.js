@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-import { createUser, findUserByEmail } from "../repositories/user.repository.js";
-import { comparePassword, hashPassword } from "./password.service.js";
-import { publishUserRegistered } from "./rabbitmq.service.js";
-import { createSession, destroySession, getSessionUser } from "./session.service.js";
-=======
 import {
     createUser,
     findUserByEmail,
@@ -23,7 +17,6 @@ function sanitizeUser(user) {
     const { password, ...safeUser } = user;
     return safeUser;
 }
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 
 export async function register(data) {
     const existingUser = await findUserByEmail(data.email);
@@ -44,11 +37,7 @@ export async function register(data) {
         email: user.email,
     });
 
-<<<<<<< HEAD
-    return user;
-=======
     return sanitizeUser(user);
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 }
 
 export async function login(req, data) {
@@ -64,15 +53,9 @@ export async function login(req, data) {
         throw new Error("Invalid credentials");
     }
 
-<<<<<<< HEAD
-    createSession(req, user);
-
-    return user;
-=======
     await createSession(req, user);
 
     return sanitizeUser(user);
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 }
 
 export async function logout(req) {
@@ -81,8 +64,4 @@ export async function logout(req) {
 
 export function getCurrentUser(req) {
     return getSessionUser(req);
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)

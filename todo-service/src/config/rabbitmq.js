@@ -1,25 +1,6 @@
 import amqp from "amqplib";
 import { env } from "./env.js";
 
-<<<<<<< HEAD
-let connection;
-let channel;
-
-export async function connectRabbitMQ() {
-    try {
-        connection = await amqp.connect(env.RABBITMQ_URL);
-
-        channel = await connection.createChannel();
-
-        await channel.assertExchange("notification.exchange", "topic", {
-            durable: true,
-        });
-
-        console.log("✅ RabbitMQ Connected");
-    } catch (error) {
-        console.error(error);
-        process.exit(1);
-=======
 let connection = null;
 let channel = null;
 let reconnecting = false;
@@ -51,12 +32,10 @@ export async function connectRabbitMQ() {
         console.log("✅ RabbitMQ channel created");
         console.log(`✅ Exchange "${EXCHANGE_NAME}" ready`);
 
-        // Connection error
         connection.on("error", (error) => {
             console.error("❌ RabbitMQ connection error:", error.message);
         });
 
-        // Connection closed
         connection.on("close", () => {
             console.error("⚠️ RabbitMQ connection closed");
 
@@ -69,12 +48,10 @@ export async function connectRabbitMQ() {
             }, 5000);
         });
 
-        // Channel error
         channel.on("error", (error) => {
             console.error("❌ RabbitMQ channel error:", error.message);
         });
 
-        // Channel closed
         channel.on("close", () => {
             console.error("⚠️ RabbitMQ channel closed");
 
@@ -94,7 +71,6 @@ export async function connectRabbitMQ() {
         setTimeout(() => {
             connectRabbitMQ();
         }, 5000);
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
     }
 }
 

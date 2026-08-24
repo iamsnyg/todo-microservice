@@ -179,7 +179,7 @@ services:
   # Todo Service
   # ==========================================
   todo-service:
-    image: todo-todo-service:1.0.0
+    image: todo-service:1.0.0
     container_name: todo-todo-service
     restart: unless-stopped
 
@@ -236,7 +236,7 @@ services:
   # Notification Service
   # ==========================================
   notification-service:
-    image: todo-notification-service:1.0.0
+    image: notification-service:1.0.0
     container_name: todo-notification-service
     restart: unless-stopped
 
@@ -325,7 +325,7 @@ services:
       context: ../../frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:8000
+        NEXT_PUBLIC_API_URL: http://13.206.80.36:8000
 
     container_name: todo-frontend
     restart: unless-stopped

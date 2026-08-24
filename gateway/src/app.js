@@ -2,15 +2,13 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-<<<<<<< HEAD
-import { createProxyMiddleware } from "http-proxy-middleware";
-import compression from "compression";
-=======
-import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
 import compression from "compression";
 import hpp from "hpp";
+import {
+    createProxyMiddleware,
+    fixRequestBody,
+} from "http-proxy-middleware";
 
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 import { env } from "./config/env.js";
 import { authenticate } from "./middlewares/auth.middleware.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
@@ -18,14 +16,6 @@ import { apiLimiter } from "./middlewares/rateLimit.middleware.js";
 import { requestId } from "./middlewares/requestId.middleware.js";
 import { requestLogger } from "./middlewares/logger.middleware.js";
 
-<<<<<<< HEAD
-import hpp from "hpp";
-
-const app = express();
-
-app.disable("x-powered-by");
-app.set("trust proxy", 1);
-=======
 const app = express();
 
 /*
@@ -35,31 +25,22 @@ const app = express();
 */
 
 app.disable("x-powered-by");
-
 app.set("trust proxy", 1);
 
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 app.use(
     cors({
         origin: env.CLIENT_URL,
         credentials: true,
         methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-        allowedHeaders: ["Content-Type", "Authorization", "x-request-id"],
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization",
+            "x-request-id",
+        ],
     }),
 );
 
 app.use(helmet());
-<<<<<<< HEAD
-app.use(hpp());
-app.use(compression());
-app.use(morgan("dev"));
-// app.use(
-//     express.json({
-//         limit: "10kb",
-//     }),
-// );
-=======
-
 app.use(hpp());
 
 /*
@@ -89,7 +70,6 @@ app.use(
         limit: "10kb",
     }),
 );
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 
 app.use(
     express.urlencoded({
@@ -97,13 +77,6 @@ app.use(
         limit: "10kb",
     }),
 );
-<<<<<<< HEAD
-app.use(apiLimiter);
-app.use(requestId);
-app.use(requestLogger);
-// app.use(requestTimeout);
-// app.use(haltOnTimedout);
-=======
 
 /*
 |--------------------------------------------------------------------------
@@ -112,9 +85,7 @@ app.use(requestLogger);
 */
 
 app.use(apiLimiter);
-
 app.use(requestId);
-
 app.use(requestLogger);
 
 /*
@@ -122,7 +93,6 @@ app.use(requestLogger);
 | Health Check
 |--------------------------------------------------------------------------
 */
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 
 app.get("/health", (req, res) => {
     res.status(200).json({
@@ -133,13 +103,9 @@ app.get("/health", (req, res) => {
 
 /*
 |--------------------------------------------------------------------------
-<<<<<<< HEAD
-| Auth Service (Public Routes)
-=======
 | Auth Service
 |--------------------------------------------------------------------------
 | Public routes
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 |--------------------------------------------------------------------------
 */
 
@@ -148,18 +114,6 @@ app.use(
     createProxyMiddleware({
         target: env.AUTH_SERVICE_URL,
         changeOrigin: true,
-<<<<<<< HEAD
-        pathRewrite: (path) => "/api/auth" + path,
-
-        on: {
-            error(err, req, res) {
-                console.error("Auth Service Error:", err.message);
-
-                res.status(503).json({
-                    success: false,
-                    message: "Auth Service Unavailable",
-                });
-=======
 
         pathRewrite: (path) => "/api/auth" + path,
 
@@ -167,8 +121,7 @@ app.use(
             proxyReq(proxyReq, req) {
                 /*
                  * express.json() has already consumed the body.
-                 * fixRequestBody() puts the parsed body back
-                 * into the proxied request.
+                 * Restore the parsed body before proxying.
                  */
                 fixRequestBody(proxyReq, req);
             },
@@ -182,7 +135,6 @@ app.use(
                         message: "Auth Service Unavailable",
                     });
                 }
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
             },
         },
     }),
@@ -190,13 +142,9 @@ app.use(
 
 /*
 |--------------------------------------------------------------------------
-<<<<<<< HEAD
-| Todo Service (Protected Routes)
-=======
 | Todo Service
 |--------------------------------------------------------------------------
 | Protected routes
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 |--------------------------------------------------------------------------
 */
 
@@ -208,45 +156,28 @@ app.use(
         target: env.TODO_SERVICE_URL,
         changeOrigin: true,
 
-<<<<<<< HEAD
-        proxyTimeout: 10000, // 10 seconds
-        timeout: 10000, // 10 seconds
-=======
         proxyTimeout: 10000,
         timeout: 10000,
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 
         pathRewrite: (path) => "/api/todos" + path,
 
         on: {
             proxyReq(proxyReq, req) {
-<<<<<<< HEAD
-                if (req.user) {
-                    proxyReq.setHeader("x-user-id", req.user.id);
-                    proxyReq.setHeader("x-user-email", req.user.email);
-                    proxyReq.setHeader("x-user-role", req.user.role);
-                    proxyReq.setHeader("x-gateway-secret", env.GATEWAY_SECRET);
-                    proxyReq.setHeader("x-request-id", req.requestId);
-                }
-            },
-
-            error(err, req, res) {
-=======
                 /*
-                 * IMPORTANT:
-                 * Set custom headers BEFORE fixRequestBody().
+                 * Set authentication/user headers.
                  */
-
                 if (req.user) {
                     proxyReq.setHeader("x-user-id", req.user.id);
-
                     proxyReq.setHeader("x-user-email", req.user.email);
-
                     proxyReq.setHeader("x-user-role", req.user.role);
-
-                    proxyReq.setHeader("x-gateway-secret", env.GATEWAY_SECRET);
-
-                    proxyReq.setHeader("x-request-id", req.requestId);
+                    proxyReq.setHeader(
+                        "x-gateway-secret",
+                        env.GATEWAY_SECRET,
+                    );
+                    proxyReq.setHeader(
+                        "x-request-id",
+                        req.requestId,
+                    );
                 }
 
                 /*
@@ -258,7 +189,6 @@ app.use(
             error(err, req, res) {
                 console.error("Todo Service Error:", err.message);
 
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
                 if (!res.headersSent) {
                     res.status(504).json({
                         success: false,
@@ -269,23 +199,12 @@ app.use(
         },
     }),
 );
-<<<<<<< HEAD
-=======
 
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 /*
 |--------------------------------------------------------------------------
 | Notification Service
 |--------------------------------------------------------------------------
-<<<<<<< HEAD
-*/
-
-/*
-|--------------------------------------------------------------------------
-| Notification Service (Protected Routes)
-=======
 | Protected routes
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 |--------------------------------------------------------------------------
 */
 
@@ -304,38 +223,21 @@ app.use(
 
         on: {
             proxyReq(proxyReq, req) {
-<<<<<<< HEAD
+                /*
+                 * Set authentication/user headers.
+                 */
                 if (req.user) {
                     proxyReq.setHeader("x-user-id", req.user.id);
                     proxyReq.setHeader("x-user-email", req.user.email);
                     proxyReq.setHeader("x-user-role", req.user.role);
                     proxyReq.setHeader(
                         "x-gateway-secret",
-                        env.GATEWAY_SECRET
+                        env.GATEWAY_SECRET,
                     );
                     proxyReq.setHeader(
                         "x-request-id",
-                        req.requestId
+                        req.requestId,
                     );
-                }
-            },
-
-            error(err, req, res) {
-=======
-                /*
-                 * Set custom headers BEFORE fixRequestBody().
-                 */
-
-                if (req.user) {
-                    proxyReq.setHeader("x-user-id", req.user.id);
-
-                    proxyReq.setHeader("x-user-email", req.user.email);
-
-                    proxyReq.setHeader("x-user-role", req.user.role);
-
-                    proxyReq.setHeader("x-gateway-secret", env.GATEWAY_SECRET);
-
-                    proxyReq.setHeader("x-request-id", req.requestId);
                 }
 
                 /*
@@ -345,9 +247,11 @@ app.use(
             },
 
             error(err, req, res) {
-                console.error("Notification Service Error:", err.message);
+                console.error(
+                    "Notification Service Error:",
+                    err.message,
+                );
 
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
                 if (!res.headersSent) {
                     res.status(504).json({
                         success: false,
@@ -359,9 +263,6 @@ app.use(
     }),
 );
 
-<<<<<<< HEAD
-app.use(errorHandler);
-=======
 /*
 |--------------------------------------------------------------------------
 | Global Error Handler
@@ -370,5 +271,4 @@ app.use(errorHandler);
 
 app.use(errorHandler);
 
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 export default app;

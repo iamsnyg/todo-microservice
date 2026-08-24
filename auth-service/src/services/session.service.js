@@ -1,13 +1,4 @@
 export function createSession(req, user) {
-<<<<<<< HEAD
-    req.session.user = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-    };
-}
-
-=======
     return new Promise((resolve, reject) => {
         req.session.user = {
             id: user.id,
@@ -25,8 +16,6 @@ export function createSession(req, user) {
     });
 }
 
-
->>>>>>> 616da95 (Add Todo microservices DevOps configuration)
 export function destroySession(req) {
     return new Promise((resolve, reject) => {
         req.session.destroy((err) => {
