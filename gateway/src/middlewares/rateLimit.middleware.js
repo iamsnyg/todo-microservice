@@ -9,6 +9,8 @@ export const apiLimiter = rateLimit({
 
     legacyHeaders: false,
 
+    skip: (req) => req.path === "/health",
+
     message: {
         success: false,
         message: "Too many requests. Please try again later.",

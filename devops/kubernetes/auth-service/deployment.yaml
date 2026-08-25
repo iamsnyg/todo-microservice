@@ -37,7 +37,7 @@ spec:
       containers:
         - name: auth-service
 
-          image: todo-auth-service:1.0
+          image: iamsnyg/todo-auth-service:1.0.1
           imagePullPolicy: IfNotPresent
 
           ports:

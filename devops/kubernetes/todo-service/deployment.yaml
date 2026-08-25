@@ -37,7 +37,7 @@ spec:
       containers:
         - name: todo-service
 
-          image: todo-todo-service:1.0
+          image: iamsnyg/todo-service:1.0.1
           imagePullPolicy: IfNotPresent
 
           ports:
@@ -143,6 +143,7 @@ spec:
           # ==========================================
 
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
 
             capabilities:

@@ -49,6 +49,10 @@ COPY --from=builder --chown=nodeapp:nodeapp /app/node_modules ./node_modules
 # Copy generated Prisma Client
 COPY --from=builder --chown=nodeapp:nodeapp /app/generated ./generated
 
+# Copy Prisma schema, migrations, and config
+COPY --from=builder --chown=nodeapp:nodeapp /app/prisma ./prisma
+COPY --from=builder --chown=nodeapp:nodeapp /app/prisma.config.ts ./prisma.config.ts
+
 # Copy application
 COPY --from=builder --chown=nodeapp:nodeapp /app/src ./src
 
@@ -59,7 +63,6 @@ USER nodeapp
 
 EXPOSE 5002
 
-# Container health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:5002/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 

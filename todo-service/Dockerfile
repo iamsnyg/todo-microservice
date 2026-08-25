@@ -32,9 +32,12 @@ RUN npm ci --omit=dev
 
 COPY --from=dependencies /app/generated ./generated
 
+COPY --from=dependencies /app/prisma ./prisma
+COPY --from=dependencies /app/prisma.config.ts ./prisma.config.ts
+
 COPY src ./src
 
-USER node
+USER 1000
 
 EXPOSE 5001
 

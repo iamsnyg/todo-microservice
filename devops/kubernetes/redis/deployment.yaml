@@ -57,8 +57,6 @@ spec:
 
           volumeMounts:
             - name: redis-storage
-              persistentVolumeClaim:
-              claimName: redis-pvc
               mountPath: /data
 
           readinessProbe:

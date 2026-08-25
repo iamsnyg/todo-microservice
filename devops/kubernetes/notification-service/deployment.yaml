@@ -37,7 +37,7 @@ spec:
       containers:
         - name: notification-service
 
-          image: todo-notification-service:1.0.0
+          image: iamsnyg/notification-service:1.0.0
           imagePullPolicy: IfNotPresent
 
           ports:
