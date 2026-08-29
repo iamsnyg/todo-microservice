@@ -50,7 +50,7 @@ spec:
       containers:
         - name: auth-migration
 
-          image: todo-auth-service:1.0
+          image: iamsnyg/todo-auth-service-migration:1.1.1
           imagePullPolicy: IfNotPresent
 
           command:

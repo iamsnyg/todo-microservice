@@ -37,7 +37,7 @@ spec:
       containers:
         - name: notification-service
 
-          image: iamsnyg/notification-service:1.0.0
+          image: iamsnyg/notification-service:1.1.0
           imagePullPolicy: IfNotPresent
 
           ports:
