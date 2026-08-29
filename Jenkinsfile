@@ -16,54 +16,70 @@ pipeline {
 
         stage("Verify Project") {
             steps {
-                powershell '''
-                    Write-Host "Checking project structure..."
+                sh '''
+                    set -e
 
-                    if (!(Test-Path "auth-service")) {
-                        throw "auth-service directory not found"
-                    }
+                    echo "Checking project structure..."
 
-                    if (!(Test-Path "todo-service")) {
-                        throw "todo-service directory not found"
-                    }
+                    test -d auth-service
+                    test -d todo-service
+                    test -d notification-service
+                    test -d gateway
+                    test -d frontend
 
-                    if (!(Test-Path "notification-service")) {
-                        throw "notification-service directory not found"
-                    }
-
-                    if (!(Test-Path "gateway")) {
-                        throw "gateway directory not found"
-                    }
-
-                    if (!(Test-Path "frontend")) {
-                        throw "frontend directory not found"
-                    }
-
-                    Write-Host "Project structure OK."
+                    echo "Project structure OK."
                 '''
             }
         }
 
         stage("Build Docker Images") {
             steps {
-                powershell '''
-                    docker build -t ${env.DOCKER_NAMESPACE}/todo-auth-service:${env.BUILD_NUMBER} ./auth-service
-                    docker build -t ${env.DOCKER_NAMESPACE}/todo-service:${env.BUILD_NUMBER} ./todo-service
-                    docker build -t ${env.DOCKER_NAMESPACE}/todo-notification-service:${env.BUILD_NUMBER} ./notification-service
-                    docker build -t ${env.DOCKER_NAMESPACE}/todo-gateway:${env.BUILD_NUMBER} ./gateway
-                    docker build -t ${env.DOCKER_NAMESPACE}/todo-frontend:${env.BUILD_NUMBER} --build-arg NEXT_PUBLIC_API_URL=/api ./frontend
+                sh '''
+                    set -e
+
+                    docker build \
+                      -t ${DOCKER_NAMESPACE}/todo-auth-service:${BUILD_NUMBER} \
+                      ./auth-service
+
+                    docker build \
+                      -t ${DOCKER_NAMESPACE}/todo-service:${BUILD_NUMBER} \
+                      ./todo-service
+
+                    docker build \
+                      -t ${DOCKER_NAMESPACE}/todo-notification-service:${BUILD_NUMBER} \
+                      ./notification-service
+
+                    docker build \
+                      -t ${DOCKER_NAMESPACE}/todo-gateway:${BUILD_NUMBER} \
+                      ./gateway
+
+                    docker build \
+                      -t ${DOCKER_NAMESPACE}/todo-frontend:${BUILD_NUMBER} \
+                      --build-arg NEXT_PUBLIC_API_URL=/api \
+                      ./frontend
                 '''
             }
         }
 
         stage("Docker Images") {
             steps {
-                powershell '''
-                    docker images ${env.DOCKER_NAMESPACE}/todo-auth-service
-                    docker images ${env.DOCKER_NAMESPACE}/todo-service
-                    docker images ${env.DOCKER_NAMESPACE}/todo-notification-service
-                    docker images ${env.DOCKER_NAMESPACE}/todo-gateway
-                    docker images ${env.DOCKER_NAMESPACE}/todo-frontend
+                sh '''
+                    set -e
+
+                    echo "===== Auth Service ====="
+                    docker images ${DOCKER_NAMESPACE}/todo-auth-service
+
+                    echo "===== Todo Service ====="
+                    docker images ${DOCKER_NAMESPACE}/todo-service
+
+                    echo "===== Notification Service ====="
+                    docker images ${DOCKER_NAMESPACE}/todo-notification-service
+
+                    echo "===== Gateway ====="
+                    docker images ${DOCKER_NAMESPACE}/todo-gateway
+
+                    echo "===== Frontend ====="
+                    docker images ${DOCKER_NAMESPACE}/todo-frontend
                 '''
             }
         }
