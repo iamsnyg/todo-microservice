@@ -37,7 +37,7 @@ spec:
       containers:
         - name: gateway
 
-          image: iamsnyg/todo-gateway:1.1.0
+          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-gateway:1
           imagePullPolicy: IfNotPresent
 
           ports:

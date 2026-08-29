@@ -37,7 +37,7 @@ spec:
       containers:
         - name: frontend
 
-          image: iamsnyg/todo-frontend:1.1.1
+          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-frontend:1
 
           imagePullPolicy: IfNotPresent
 
