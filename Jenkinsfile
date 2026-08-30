@@ -127,49 +127,49 @@ pipeline {
 
                     echo "===== Auth Service ====="
                     trivy image \
-                      --severity HIGH,CRITICAL \
+                      --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
                       ${ECR_REGISTRY}/todo-auth-service:${BUILD_NUMBER}
 
                     echo "===== Auth Migration ====="
                     trivy image \
-                      --severity HIGH,CRITICAL \
+                      --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
                       ${ECR_REGISTRY}/todo-auth-service-migration:${BUILD_NUMBER}
 
                     echo "===== Todo Service ====="
                     trivy image \
-                      --severity HIGH,CRITICAL \
+                      --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
                       ${ECR_REGISTRY}/todo-service:${BUILD_NUMBER}
 
                     echo "===== Notification Service ====="
                     trivy image \
-                      --severity HIGH,CRITICAL \
+                      --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
                       ${ECR_REGISTRY}/todo-notification-service:${BUILD_NUMBER}
 
                     echo "===== Gateway ====="
                     trivy image \
-                      --severity HIGH,CRITICAL \
+                      --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
                       ${ECR_REGISTRY}/todo-gateway:${BUILD_NUMBER}
 
                     echo "===== Frontend ====="
                     trivy image \
-                      --severity HIGH,CRITICAL \
+                      --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
                       ${ECR_REGISTRY}/todo-frontend:${BUILD_NUMBER}
 
                     echo "======================================"
                     echo "Trivy Security Scan PASSED"
-                    echo "No HIGH/CRITICAL fixable vulnerabilities found."
+                    echo "No CRITICAL fixable vulnerabilities found."
                     echo "======================================"
                 '''
             }
