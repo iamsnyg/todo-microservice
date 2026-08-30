@@ -21,7 +21,8 @@ RUN npm ci
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 
-RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
+    npx prisma generate
 
 
 # ==========================================
@@ -41,7 +42,6 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY --from=dependencies /app/generated ./generated
-
 COPY --from=dependencies /app/prisma ./prisma
 COPY --from=dependencies /app/prisma.config.ts ./prisma.config.ts
 
@@ -52,3 +52,18 @@ USER 1000
 EXPOSE 5001
 
 CMD ["npm", "start"]
+
+
+# ==========================================
+# Stage 3: Migration
+# ==========================================
+
+FROM dependencies AS migration
+
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx
+
+USER 1000
+
+CMD ["node", "/app/node_modules/prisma/build/index.js", "migrate", "deploy"]

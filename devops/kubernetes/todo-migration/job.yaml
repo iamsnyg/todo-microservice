@@ -50,7 +50,7 @@ spec:
       containers:
         - name: todo-migration
 
-          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-service:1
+          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-service:1.0.0
           imagePullPolicy: IfNotPresent
 
           command:

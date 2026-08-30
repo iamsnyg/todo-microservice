@@ -5,6 +5,7 @@ pipeline {
         AWS_REGION = "ap-south-1"
         AWS_ACCOUNT_ID = "586197446523"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+	IMAGE_TAG = "1.0.0"
     }
 
     stages {
@@ -51,44 +52,65 @@ pipeline {
             }
         }
 
-        stage("Build Docker Images") {
-            steps {
-                sh '''
-                    set -e
+	stage("Build Docker Images") {
+	    steps {
+ 	       sh '''
+	            set -e
 
-                    echo "Building Docker images..."
+	            echo "Building production and migration Docker images..."
+	            echo "Image tag: ${IMAGE_TAG}"
 
-                    docker build \
-		      --target production \
-                      -t ${ECR_REGISTRY}/todo-auth-service:${BUILD_NUMBER} \
-                      ./auth-service
+	            # Auth production
+	            docker build \
+	              --target production \
+	              -t ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG} \
+	              ./auth-service
+	
+	            # Auth migration
+	            docker build \
+	              --target migration \
+	              -t ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG} \
+	              ./auth-service
 
-                    docker build \
-                      --target migration \
-                      -t ${ECR_REGISTRY}/todo-auth-service-migration:${BUILD_NUMBER} \
-                      ./auth-service
+	            # Todo production
+	            docker build \
+	              --target production \
+	              -t ${ECR_REGISTRY}/todo-service:${IMAGE_TAG} \
+	              ./todo-service
+	
+	            # Todo migration
+	            docker build \
+	              --target migration \
+	              -t ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG} \
+	              ./todo-service
 
-                    docker build \
-                      -t ${ECR_REGISTRY}/todo-service:${BUILD_NUMBER} \
-                      ./todo-service
+	            # Notification production
+	            docker build \
+	              --target production \
+	              -t ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG} \
+	              ./notification-service
 
-                    docker build \
-                      -t ${ECR_REGISTRY}/todo-notification-service:${BUILD_NUMBER} \
-                      ./notification-service
+	            # Notification migration
+	            docker build \
+	              --target migration \
+	              -t ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG} \
+	              ./notification-service
 
-                    docker build \
-                      -t ${ECR_REGISTRY}/todo-gateway:${BUILD_NUMBER} \
-                      ./gateway
+	            # Gateway production
+	            docker build \
+	              -t ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG} \
+	              ./gateway
 
-                    docker build \
-                      -t ${ECR_REGISTRY}/todo-frontend:${BUILD_NUMBER} \
-                      --build-arg NEXT_PUBLIC_API_URL=/api \
-                      ./frontend
+  	            # Frontend production
+	            docker build \
+	              -t ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG} \
+	              --build-arg NEXT_PUBLIC_API_URL=/api \
+	              ./frontend
 
-                    echo "All Docker images built successfully."
-                '''
-            }
-        }
+ 	           echo "All production and migration images built successfully."
+	        '''
+	    }
+	}
 
         stage("Docker Images") {
             steps {
@@ -96,22 +118,28 @@ pipeline {
                     set -e
 
                     echo "===== Auth Service ====="
-                    docker images ${ECR_REGISTRY}/todo-auth-service
+                    docker images ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
 
                     echo "===== Auth Migration ====="
-                    docker images ${ECR_REGISTRY}/todo-auth-service-migration
+                    docker images ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
 
                     echo "===== Todo Service ====="
-                    docker images ${ECR_REGISTRY}/todo-service
+                    docker images ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
+
+                    echo "===== Todo Migration ====="
+                    docker images ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
 
                     echo "===== Notification Service ====="
-                    docker images ${ECR_REGISTRY}/todo-notification-service
+                    docker images ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
+
+                    echo "===== Notification Migration ====="
+                    docker images ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
 
                     echo "===== Gateway ====="
-                    docker images ${ECR_REGISTRY}/todo-gateway
+                    docker images ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
 
                     echo "===== Frontend ====="
-                    docker images ${ECR_REGISTRY}/todo-frontend
+                    docker images ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
                 '''
             }
         }
@@ -123,6 +151,7 @@ pipeline {
 
                     echo "======================================"
                     echo "Starting Trivy Security Scan"
+                    echo "Image tag: ${IMAGE_TAG}"
                     echo "======================================"
 
                     echo "===== Auth Service ====="
@@ -130,42 +159,56 @@ pipeline {
                       --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-auth-service:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
 
                     echo "===== Auth Migration ====="
                     trivy image \
                       --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-auth-service-migration:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
 
                     echo "===== Todo Service ====="
                     trivy image \
                       --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-service:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
+
+                    echo "===== Todo Migration ====="
+                    trivy image \
+                      --severity CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
 
                     echo "===== Notification Service ====="
                     trivy image \
                       --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-notification-service:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
+
+                    echo "===== Notification Migration ====="
+                    trivy image \
+                      --severity CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
 
                     echo "===== Gateway ====="
                     trivy image \
                       --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-gateway:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
 
                     echo "===== Frontend ====="
                     trivy image \
                       --severity CRITICAL \
                       --exit-code 1 \
                       --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-frontend:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
 
                     echo "======================================"
                     echo "Trivy Security Scan PASSED"
@@ -180,27 +223,34 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "Pushing images to Amazon ECR..."
+                    echo "Pushing production and migration images to ECR..."
+                    echo "Image tag: ${IMAGE_TAG}"
 
                     docker push \
-                      ${ECR_REGISTRY}/todo-auth-service:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
 
                     docker push \
-                      ${ECR_REGISTRY}/todo-auth-service-migration:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
 
                     docker push \
-                      ${ECR_REGISTRY}/todo-service:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
 
                     docker push \
-                      ${ECR_REGISTRY}/todo-notification-service:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
 
                     docker push \
-                      ${ECR_REGISTRY}/todo-gateway:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
 
                     docker push \
-                      ${ECR_REGISTRY}/todo-frontend:${BUILD_NUMBER}
+                      ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
 
-                    echo "All images pushed successfully to ECR."
+                    docker push \
+                      ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
+
+                    docker push \
+                      ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
+
+                    echo "All production and migration images pushed successfully."
                 '''
             }
         }
@@ -212,35 +262,37 @@ pipeline {
 
                     echo "======================================"
                     echo "Verifying ECR Images"
-                    echo "Build tag: ${BUILD_NUMBER}"
+                    echo "Image tag: ${IMAGE_TAG}"
                     echo "======================================"
 
                     repositories="
                     todo-auth-service
                     todo-auth-service-migration
                     todo-service
+                    todo-service-migration
                     todo-notification-service
+                    todo-notification-service-migration
                     todo-gateway
                     todo-frontend
                     "
 
                     for repository in $repositories; do
                         echo ""
-                        echo "Checking: $repository"
+                        echo "Checking: $repository:${IMAGE_TAG}"
 
                         digest=$(aws ecr describe-images \
                           --repository-name "$repository" \
                           --region "${AWS_REGION}" \
-                          --image-ids imageTag="${BUILD_NUMBER}" \
+                          --image-ids imageTag="${IMAGE_TAG}" \
                           --query 'imageDetails[0].imageDigest' \
                           --output text)
 
                         if [ -z "$digest" ] || [ "$digest" = "None" ]; then
-                            echo "ERROR: Image tag ${BUILD_NUMBER} not found in $repository"
+                            echo "ERROR: Image tag ${IMAGE_TAG} not found in $repository"
                             exit 1
                         fi
 
-                        echo "PASS: $repository:${BUILD_NUMBER}"
+                        echo "PASS: $repository:${IMAGE_TAG}"
                         echo "Digest: $digest"
                     done
 
@@ -251,7 +303,6 @@ pipeline {
                 '''
             }
         }
-    }
 
     post {
         success {

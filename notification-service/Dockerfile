@@ -1,40 +1,28 @@
 # ==========================================
-# Stage 1: Build
+# Stage 1: Dependencies + Prisma Client
 # ==========================================
-FROM node:22-bookworm-slim AS builder
+
+FROM node:22-bookworm-slim AS dependencies
 
 WORKDIR /app
 
-# Upgrade npm to a version containing tar >= 7.5.19.
-# npm itself is only needed during the build.
 RUN npm install -g npm@12.0.2
 
-# Copy dependency manifests first for better Docker layer caching
 COPY package.json package-lock.json ./
 
-# Install all dependencies required for build/Prisma generation
 RUN npm ci
 
-# Copy only files required for Prisma generation
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 
-# Prisma 7 requires DATABASE_URL while loading prisma.config.ts.
-# This is ONLY a build-time dummy value.
-# The real DATABASE_URL is provided at runtime.
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
     npx prisma generate
-
-# Copy application source
-COPY src ./src
-
-# Remove development dependencies
-RUN npm prune --omit=dev
 
 
 # ==========================================
 # Stage 2: Production
 # ==========================================
+
 FROM node:22-bookworm-slim AS production
 
 RUN npm install -g npm@12.0.2
@@ -43,25 +31,16 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-# Create dedicated non-root user
 RUN groupadd --system --gid 1001 nodeapp \
     && useradd --system --uid 1001 --gid nodeapp nodeapp
 
-# Copy only production dependencies
-COPY --from=builder --chown=nodeapp:nodeapp /app/node_modules ./node_modules
+COPY --from=dependencies --chown=nodeapp:nodeapp /app/package.json ./package.json
+COPY --from=dependencies --chown=nodeapp:nodeapp /app/node_modules ./node_modules
+COPY --from=dependencies --chown=nodeapp:nodeapp /app/generated ./generated
+COPY --from=dependencies --chown=nodeapp:nodeapp /app/prisma ./prisma
+COPY --from=dependencies --chown=nodeapp:nodeapp /app/prisma.config.ts ./prisma.config.ts
 
-# Copy generated Prisma Client
-COPY --from=builder --chown=nodeapp:nodeapp /app/generated ./generated
-
-# Copy Prisma schema, migrations, and config
-COPY --from=builder --chown=nodeapp:nodeapp /app/prisma ./prisma
-COPY --from=builder --chown=nodeapp:nodeapp /app/prisma.config.ts ./prisma.config.ts
-
-# Copy application
-COPY --from=builder --chown=nodeapp:nodeapp /app/src ./src
-
-# package.json is useful for runtime metadata
-COPY --from=builder --chown=nodeapp:nodeapp /app/package.json ./package.json
+COPY --chown=nodeapp:nodeapp src ./src
 
 USER nodeapp
 
@@ -72,3 +51,17 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 CMD ["node", "src/server.js"]
 
+
+# ==========================================
+# Stage 3: Migration
+# ==========================================
+
+FROM dependencies AS migration
+
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx
+
+USER 1001
+
+CMD ["node", "/app/node_modules/prisma/build/index.js", "migrate", "deploy"]
