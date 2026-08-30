@@ -4,6 +4,14 @@
 
 FROM node:22-alpine AS dependencies
 
+RUN npm install -g npm@12.0.2
+
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache \
+        libcrypto3=3.5.8-r0 \
+        libssl3=3.5.8-r0
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -21,6 +29,8 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma gene
 # ==========================================
 
 FROM node:22-alpine AS production
+
+RUN npm install -g npm@12.0.2
 
 WORKDIR /app
 
