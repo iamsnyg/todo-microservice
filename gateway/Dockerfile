@@ -5,6 +5,10 @@ FROM node:22-alpine AS dependencies
 
 WORKDIR /app
 
+# Upgrade npm so dependency installation uses
+# a version containing tar >= 7.5.19.
+RUN npm install -g npm@12.0.2
+
 COPY package.json package-lock.json ./
 
 RUN npm ci --omit=dev \
@@ -19,6 +23,13 @@ FROM node:22-alpine AS production
 WORKDIR /app
 
 ENV NODE_ENV=production
+
+# Remove npm from the runtime image.
+# The application starts directly with Node.js,
+# so npm is not required at runtime.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+    /usr/local/bin/npm \
+    /usr/local/bin/npx
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json package-lock.json ./

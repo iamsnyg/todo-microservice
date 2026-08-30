@@ -1,10 +1,13 @@
-
 # ==========================================
 # Stage 1: Build
 # ==========================================
 FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
+
+# Upgrade npm to a version containing tar >= 7.5.19.
+# npm itself is only needed during the build.
+RUN npm install -g npm@12.0.2
 
 # Copy dependency manifests first for better Docker layer caching
 COPY package.json package-lock.json ./
@@ -25,8 +28,7 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
 # Copy application source
 COPY src ./src
 
-# Remove development dependencies from the same node_modules tree.
-# This avoids running npm ci a second time.
+# Remove development dependencies
 RUN npm prune --omit=dev
 
 
@@ -34,6 +36,8 @@ RUN npm prune --omit=dev
 # Stage 2: Production
 # ==========================================
 FROM node:22-bookworm-slim AS production
+
+RUN npm install -g npm@12.0.2
 
 ENV NODE_ENV=production
 
