@@ -1,10 +1,17 @@
 # Stage 1: Dependencies + Prisma
 FROM node:22-alpine AS dependencies
 
+RUN apk update \
+    && apk upgrade --no-cache \
+    && apk add --no-cache \
+        libcrypto3=3.5.8-r0 \
+        libssl3=3.5.8-r0
+
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci \
+    && npm install -g npm@12
 
 COPY prisma ./prisma
 COPY prisma.config.ts ./
@@ -42,4 +49,10 @@ CMD ["node", "src/server.js"]
 # Stage 3: Migration
 FROM dependencies AS migration
 
-CMD ["npx", "prisma", "migrate", "deploy"]
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx
+
+USER node
+
+CMD ["node", "/app/node_modules/prisma/build/index.js", "migrate", "deploy"]
