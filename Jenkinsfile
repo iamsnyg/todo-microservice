@@ -59,6 +59,7 @@ pipeline {
                     echo "Building Docker images..."
 
                     docker build \
+		      --target production \
                       -t ${ECR_REGISTRY}/todo-auth-service:${BUILD_NUMBER} \
                       ./auth-service
 
