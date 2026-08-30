@@ -115,6 +115,65 @@ pipeline {
             }
         }
 
+        stage("Trivy Security Scan") {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "======================================"
+                    echo "Starting Trivy Security Scan"
+                    echo "======================================"
+
+                    echo "===== Auth Service ====="
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-auth-service:${BUILD_NUMBER}
+
+                    echo "===== Auth Migration ====="
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-auth-service-migration:${BUILD_NUMBER}
+
+                    echo "===== Todo Service ====="
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-service:${BUILD_NUMBER}
+
+                    echo "===== Notification Service ====="
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-notification-service:${BUILD_NUMBER}
+
+                    echo "===== Gateway ====="
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-gateway:${BUILD_NUMBER}
+
+                    echo "===== Frontend ====="
+                    trivy image \
+                      --severity HIGH,CRITICAL \
+                      --exit-code 1 \
+                      --ignore-unfixed \
+                      ${ECR_REGISTRY}/todo-frontend:${BUILD_NUMBER}
+
+                    echo "======================================"
+                    echo "Trivy Security Scan PASSED"
+                    echo "No HIGH/CRITICAL fixable vulnerabilities found."
+                    echo "======================================"
+                '''
+            }
+        }
+
         stage("Push Images to ECR") {
             steps {
                 sh '''
@@ -194,15 +253,17 @@ pipeline {
 
     post {
         success {
-            echo "Docker images built and pushed to ECR successfully."
+            echo "CI pipeline completed successfully."
+            echo "Docker images passed Trivy security scan and were pushed to ECR."
         }
 
         failure {
-            echo "Pipeline failed. Check the failed stage and logs."
+            echo "CI pipeline failed."
+            echo "Check the failed stage and Jenkins console logs."
         }
 
         always {
-            echo "Pipeline finished."
+            echo "CI pipeline finished."
         }
     }
 }
