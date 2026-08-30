@@ -210,43 +210,44 @@ pipeline {
                 sh '''
                     set -e
 
-                    echo "===== ECR Images ====="
+                    echo "======================================"
+                    echo "Verifying ECR Images"
+                    echo "Build tag: ${BUILD_NUMBER}"
+                    echo "======================================"
 
-                    aws ecr describe-images \
-                      --repository-name todo-auth-service \
-                      --region ${AWS_REGION} \
-                      --query 'imageDetails[].imageTags' \
-                      --output table
+                    repositories="
+                    todo-auth-service
+                    todo-auth-service-migration
+                    todo-service
+                    todo-notification-service
+                    todo-gateway
+                    todo-frontend
+                    "
 
-                    aws ecr describe-images \
-                      --repository-name todo-auth-service-migration \
-                      --region ${AWS_REGION} \
-                      --query 'imageDetails[].imageTags' \
-                      --output table
+                    for repository in $repositories; do
+                        echo ""
+                        echo "Checking: $repository"
 
-                    aws ecr describe-images \
-                      --repository-name todo-service \
-                      --region ${AWS_REGION} \
-                      --query 'imageDetails[].imageTags' \
-                      --output table
+                        digest=$(aws ecr describe-images \
+                          --repository-name "$repository" \
+                          --region "${AWS_REGION}" \
+                          --image-ids imageTag="${BUILD_NUMBER}" \
+                          --query 'imageDetails[0].imageDigest' \
+                          --output text)
 
-                    aws ecr describe-images \
-                      --repository-name todo-notification-service \
-                      --region ${AWS_REGION} \
-                      --query 'imageDetails[].imageTags' \
-                      --output table
+                        if [ -z "$digest" ] || [ "$digest" = "None" ]; then
+                            echo "ERROR: Image tag ${BUILD_NUMBER} not found in $repository"
+                            exit 1
+                        fi
 
-                    aws ecr describe-images \
-                      --repository-name todo-gateway \
-                      --region ${AWS_REGION} \
-                      --query 'imageDetails[].imageTags' \
-                      --output table
+                        echo "PASS: $repository:${BUILD_NUMBER}"
+                        echo "Digest: $digest"
+                    done
 
-                    aws ecr describe-images \
-                      --repository-name todo-frontend \
-                      --region ${AWS_REGION} \
-                      --query 'imageDetails[].imageTags' \
-                      --output table
+                    echo ""
+                    echo "======================================"
+                    echo "All ECR images verified successfully."
+                    echo "======================================"
                 '''
             }
         }
