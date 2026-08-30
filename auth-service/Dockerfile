@@ -21,7 +21,13 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+
+RUN apk update \
+    && apk upgrade --no-cache \
+    && npm ci --omit=dev \
+    && rm -rf /usr/local/lib/node_modules/npm \
+              /usr/local/bin/npm \
+              /usr/local/bin/npx
 
 COPY --from=dependencies /app/generated ./generated
 COPY src ./src
@@ -30,7 +36,7 @@ USER node
 
 EXPOSE 5000
 
-CMD ["npm", "start"]
+CMD ["node", "src/server.js"]
 
 
 # Stage 3: Migration
