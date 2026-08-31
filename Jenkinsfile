@@ -1,21 +1,15 @@
 pipeline {
     agent any
 
-    parameters {
-        string(
-            name: 'IMAGE_TAG',
-            defaultValue: '1.0.0',
-            description: 'Docker image tag to build, scan, push and deploy'
-        )
-    }
-
     environment {
         AWS_REGION = "ap-south-1"
         AWS_ACCOUNT_ID = "586197446523"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-        // Jenkins CD job name
         CD_JOB_NAME = "todo-app-cd"
+
+        // Git tag prefix
+        TAG_PREFIX = "v"
     }
 
     stages {
@@ -32,29 +26,106 @@ pipeline {
 
 
         // ==========================================================
-        // VALIDATE IMAGE TAG
+        // DETERMINE VERSION
         // ==========================================================
 
-        stage("Validate Image Tag") {
+        stage("Determine Version") {
             steps {
-                sh '''
-                    set -e
+                script {
 
+                    sh '''
+                        set -e
+
+                        echo "======================================"
+                        echo "Fetching Git Tags"
+                        echo "======================================"
+
+                        git fetch --tags --force
+                    '''
+
+                    // Get latest semantic version tag.
+                    def latestTag = sh(
+                        script: '''
+                            git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1
+                        ''',
+                        returnStdout: true
+                    ).trim()
+
+                    if (!latestTag) {
+                        latestTag = "v0.0.0"
+                    }
+
+                    echo "Latest Git tag: ${latestTag}"
+
+                    def version = latestTag.replaceFirst(/^v/, "")
+                    def parts = version.tokenize(".")
+
+                    if (parts.size() != 3) {
+                        error("Invalid semantic version tag: ${latestTag}")
+                    }
+
+                    int major = parts[0] as int
+                    int minor = parts[1] as int
+                    int patch = parts[2] as int
+
+                    def commitMessage = sh(
+                        script: "git log -1 --pretty=%B",
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Latest commit message:"
+                    echo commitMessage
+
+                    /*
+                     * Version rules:
+                     *
+                     * BREAKING CHANGE / !  -> MAJOR
+                     * feat:                 -> MINOR
+                     * fix:                  -> PATCH
+                     *
+                     * Other commits         -> PATCH
+                     */
+
+                    if (
+                        commitMessage =~ /(?m)^BREAKING CHANGE:/ ||
+                        commitMessage =~ /(?m)^[a-zA-Z]+(\([^)]*\))?!:/
+                    ) {
+
+                        major++
+                        minor = 0
+                        patch = 0
+
+                        echo "Version bump: MAJOR"
+
+                    } else if (commitMessage =~ /(?m)^feat(\([^)]*\))?:/) {
+
+                        minor++
+                        patch = 0
+
+                        echo "Version bump: MINOR"
+
+                    } else {
+
+                        patch++
+
+                        echo "Version bump: PATCH"
+                    }
+
+                    def newVersion = "${major}.${minor}.${patch}"
+                    def newTag = "${TAG_PREFIX}${newVersion}"
+
+                    env.IMAGE_TAG = newVersion
+                    env.GIT_TAG = newTag
+
+                    echo ""
                     echo "======================================"
-                    echo "Validating Image Tag"
+                    echo "VERSION INFORMATION"
                     echo "======================================"
-
-                    echo "IMAGE_TAG=${IMAGE_TAG}"
-
-                    if ! echo "${IMAGE_TAG}" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+$'; then
-                        echo "ERROR: Invalid image tag: ${IMAGE_TAG}"
-                        echo "Expected format: X.Y.Z"
-                        echo "Examples: 1.0.0, 1.0.1, 1.1.0"
-                        exit 1
-                    fi
-
-                    echo "Image tag is valid."
-                '''
+                    echo "Previous tag : ${latestTag}"
+                    echo "New tag      : ${newTag}"
+                    echo "IMAGE_TAG    : ${newVersion}"
+                    echo "======================================"
+                }
             }
         }
 
@@ -120,14 +191,9 @@ pipeline {
 
                     echo "======================================"
                     echo "Building Docker Images"
-                    echo "Image tag: ${IMAGE_TAG}"
+                    echo "Version: ${IMAGE_TAG}"
                     echo "======================================"
 
-                    # ==================================================
-                    # AUTH SERVICE - PRODUCTION
-                    # ==================================================
-
-                    echo "Building Auth production image..."
 
                     docker build \
                       --target production \
@@ -135,23 +201,11 @@ pipeline {
                       ./auth-service
 
 
-                    # ==================================================
-                    # AUTH SERVICE - MIGRATION
-                    # ==================================================
-
-                    echo "Building Auth migration image..."
-
                     docker build \
                       --target migration \
                       -t ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG} \
                       ./auth-service
 
-
-                    # ==================================================
-                    # TODO SERVICE - PRODUCTION
-                    # ==================================================
-
-                    echo "Building Todo production image..."
 
                     docker build \
                       --target production \
@@ -159,23 +213,11 @@ pipeline {
                       ./todo-service
 
 
-                    # ==================================================
-                    # TODO SERVICE - MIGRATION
-                    # ==================================================
-
-                    echo "Building Todo migration image..."
-
                     docker build \
                       --target migration \
                       -t ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG} \
                       ./todo-service
 
-
-                    # ==================================================
-                    # NOTIFICATION SERVICE - PRODUCTION
-                    # ==================================================
-
-                    echo "Building Notification production image..."
 
                     docker build \
                       --target production \
@@ -183,34 +225,16 @@ pipeline {
                       ./notification-service
 
 
-                    # ==================================================
-                    # NOTIFICATION SERVICE - MIGRATION
-                    # ==================================================
-
-                    echo "Building Notification migration image..."
-
                     docker build \
                       --target migration \
                       -t ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG} \
                       ./notification-service
 
 
-                    # ==================================================
-                    # GATEWAY
-                    # ==================================================
-
-                    echo "Building Gateway image..."
-
                     docker build \
                       -t ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG} \
                       ./gateway
 
-
-                    # ==================================================
-                    # FRONTEND
-                    # ==================================================
-
-                    echo "Building Frontend image..."
 
                     docker build \
                       -t ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG} \
@@ -218,17 +242,14 @@ pipeline {
 
 
                     echo ""
-                    echo "======================================"
                     echo "All images built successfully."
-                    echo "Tag: ${IMAGE_TAG}"
-                    echo "======================================"
                 '''
             }
         }
 
 
         // ==========================================================
-        // SHOW DOCKER IMAGES
+        // DOCKER IMAGE VERIFICATION
         // ==========================================================
 
         stage("Docker Images") {
@@ -237,21 +258,22 @@ pipeline {
                     set -e
 
                     echo "======================================"
-                    echo "Docker Images"
-                    echo "Tag: ${IMAGE_TAG}"
+                    echo "Verifying Docker Images"
                     echo "======================================"
 
-                    docker images ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
-                    docker images ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
 
-                    docker images ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
-                    docker images ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
 
-                    docker images ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
-                    docker images ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
 
-                    docker images ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
-                    docker images ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
+                    docker image inspect ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
+
+                    echo "All Docker images verified."
                 '''
             }
         }
@@ -268,86 +290,38 @@ pipeline {
 
                     echo "======================================"
                     echo "Starting Trivy Security Scan"
-                    echo "Tag: ${IMAGE_TAG}"
                     echo "======================================"
 
 
-                    echo "Scanning Auth production..."
-
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
-
-
-                    echo "Scanning Auth migration..."
-
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
+                    images="
+                    ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
+                    ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
+                    "
 
 
-                    echo "Scanning Todo production..."
+                    for image in $images; do
 
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
+                        echo ""
+                        echo "Scanning: ${image}"
 
+                        trivy image \
+                          --severity CRITICAL \
+                          --exit-code 1 \
+                          --ignore-unfixed \
+                          "${image}"
 
-                    echo "Scanning Todo migration..."
-
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
-
-
-                    echo "Scanning Notification production..."
-
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
-
-
-                    echo "Scanning Notification migration..."
-
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
-
-
-                    echo "Scanning Gateway..."
-
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
-
-
-                    echo "Scanning Frontend..."
-
-                    trivy image \
-                      --severity CRITICAL \
-                      --exit-code 1 \
-                      --ignore-unfixed \
-                      ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
+                    done
 
 
                     echo ""
                     echo "======================================"
                     echo "Trivy Security Scan PASSED"
-                    echo "No CRITICAL fixable vulnerabilities found."
                     echo "======================================"
                 '''
             }
@@ -364,47 +338,35 @@ pipeline {
                     set -e
 
                     echo "======================================"
-                    echo "Pushing Images to Amazon ECR"
-                    echo "Tag: ${IMAGE_TAG}"
+                    echo "Pushing Images to ECR"
+                    echo "Version: ${IMAGE_TAG}"
                     echo "======================================"
 
 
-                    docker push \
-                      ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
+                    images="
+                    todo-auth-service
+                    todo-auth-service-migration
+                    todo-service
+                    todo-service-migration
+                    todo-notification-service
+                    todo-notification-service-migration
+                    todo-gateway
+                    todo-frontend
+                    "
 
 
-                    docker push \
-                      ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
+                    for repository in $images; do
 
+                        echo "Pushing ${repository}:${IMAGE_TAG}"
 
-                    docker push \
-                      ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
+                        docker push \
+                          ${ECR_REGISTRY}/${repository}:${IMAGE_TAG}
 
-
-                    docker push \
-                      ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
-
-
-                    docker push \
-                      ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
-
-
-                    docker push \
-                      ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
-
-
-                    docker push \
-                      ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
-
-
-                    docker push \
-                      ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
+                    done
 
 
                     echo ""
-                    echo "======================================"
                     echo "All images pushed successfully."
-                    echo "======================================"
                 '''
             }
         }
@@ -421,7 +383,7 @@ pipeline {
 
                     echo "======================================"
                     echo "Verifying ECR Images"
-                    echo "Tag: ${IMAGE_TAG}"
+                    echo "Version: ${IMAGE_TAG}"
                     echo "======================================"
 
 
@@ -440,7 +402,7 @@ pipeline {
                     for repository in $repositories; do
 
                         echo ""
-                        echo "Checking: ${repository}:${IMAGE_TAG}"
+                        echo "Checking ${repository}:${IMAGE_TAG}"
 
 
                         digest=$(aws ecr describe-images \
@@ -453,7 +415,7 @@ pipeline {
 
                         if [ -z "$digest" ] || [ "$digest" = "None" ]; then
 
-                            echo "ERROR: Image ${repository}:${IMAGE_TAG} not found in ECR."
+                            echo "ERROR: ${repository}:${IMAGE_TAG} not found."
 
                             exit 1
                         fi
@@ -475,6 +437,45 @@ pipeline {
 
 
         // ==========================================================
+        // CREATE AND PUSH GIT TAG
+        // ==========================================================
+
+        stage("Create Git Tag") {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'github-credentials',
+                        usernameVariable: 'GIT_USERNAME',
+                        passwordVariable: 'GIT_TOKEN'
+                    )
+                ]) {
+
+                    sh '''
+                        set -e
+
+                        echo "======================================"
+                        echo "Creating Git Tag"
+                        echo "======================================"
+
+                        git config user.name "Jenkins CI"
+                        git config user.email "jenkins-ci@localhost"
+
+                        git tag -a "${GIT_TAG}" \
+                          -m "Release ${GIT_TAG}"
+
+                        git push \
+                          https://${GIT_USERNAME}:${GIT_TOKEN}@github.com/YOUR_USERNAME/YOUR_REPOSITORY.git \
+                          "${GIT_TAG}"
+
+                        echo ""
+                        echo "Git tag ${GIT_TAG} pushed successfully."
+                    '''
+                }
+            }
+        }
+
+
+        // ==========================================================
         // TRIGGER CD
         // ==========================================================
 
@@ -486,8 +487,10 @@ pipeline {
                     echo "Triggering CD Pipeline"
                     echo "======================================"
 
-                    echo "CD Job: ${CD_JOB_NAME}"
-                    echo "IMAGE_TAG: ${IMAGE_TAG}"
+                    echo "CD Job   : ${CD_JOB_NAME}"
+                    echo "Version  : ${IMAGE_TAG}"
+                    echo "Git Tag  : ${GIT_TAG}"
+
 
                     build job: "${CD_JOB_NAME}",
                         parameters: [
@@ -498,6 +501,7 @@ pipeline {
                         ],
                         wait: false,
                         propagate: true
+
 
                     echo "CD pipeline triggered successfully."
                 }
@@ -518,18 +522,20 @@ pipeline {
             echo "CI PIPELINE SUCCESS"
             echo "======================================"
             echo ""
-            echo "Image tag: ${IMAGE_TAG}"
+            echo "Version: ${IMAGE_TAG}"
+            echo "Git Tag: ${GIT_TAG}"
             echo ""
             echo "All images:"
             echo "- Built"
-            echo "- Security scanned"
+            echo "- Verified"
+            echo "- Trivy scanned"
             echo "- Pushed to ECR"
             echo "- Verified in ECR"
             echo ""
-            echo "CD pipeline has been triggered."
+            echo "Git tag created successfully."
+            echo "CD pipeline triggered."
             echo "======================================"
         }
-
 
         failure {
             echo ""
@@ -537,14 +543,11 @@ pipeline {
             echo "CI PIPELINE FAILED"
             echo "======================================"
             echo ""
-            echo "Image tag: ${IMAGE_TAG}"
-            echo ""
-            echo "CD pipeline will NOT be triggered."
+            echo "The CD pipeline will NOT be triggered."
             echo ""
             echo "Check the failed Jenkins stage."
             echo "======================================"
         }
-
 
         always {
             echo ""
