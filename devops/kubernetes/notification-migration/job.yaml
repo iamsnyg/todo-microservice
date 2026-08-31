@@ -54,14 +54,6 @@ spec:
 
           imagePullPolicy: IfNotPresent
 
-          command:
-            - npx
-
-          args:
-            - prisma
-            - migrate
-            - deploy
-
           env:
             - name: DATABASE_URL
               valueFrom:

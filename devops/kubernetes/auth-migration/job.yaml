@@ -53,14 +53,6 @@ spec:
           image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-auth-service-migration:1.0.0
           imagePullPolicy: IfNotPresent
 
-          command:
-            - npx
-
-          args:
-            - prisma
-            - migrate
-            - deploy
-
           env:
             - name: DATABASE_URL
               valueFrom:
