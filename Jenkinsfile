@@ -153,7 +153,6 @@ pipeline {
 
                     docker build \
                       -t ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG} \
-                      --build-arg NEXT_PUBLIC_API_URL=/api \
                       ./frontend
 
 
