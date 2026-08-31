@@ -1,0 +1,166 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '1.0.0',
+            description: 'Docker image tag produced by CI'
+        )
+    }
+
+    environment {
+        AWS_REGION = "ap-south-1"
+        AWS_ACCOUNT_ID = "586197446523"
+        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        K8S_DIR = "devops/kubernetes"
+    }
+
+    stages {
+
+        stage("Checkout") {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage("Verify ECR Images") {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "======================================"
+                    echo "Verifying ECR images"
+                    echo "Tag: ${IMAGE_TAG}"
+                    echo "======================================"
+
+                    repositories="
+                    todo-auth-service
+                    todo-auth-service-migration
+                    todo-service
+                    todo-service-migration
+                    todo-notification-service
+                    todo-notification-service-migration
+                    todo-gateway
+                    todo-frontend
+                    "
+
+                    for repository in $repositories; do
+
+                        echo "Checking $repository:${IMAGE_TAG}"
+
+                        digest=$(aws ecr describe-images \
+                          --repository-name "$repository" \
+                          --region "${AWS_REGION}" \
+                          --image-ids imageTag="${IMAGE_TAG}" \
+                          --query 'imageDetails[0].imageDigest' \
+                          --output text)
+
+                        if [ -z "$digest" ] || [ "$digest" = "None" ]; then
+                            echo "ERROR: $repository:${IMAGE_TAG} not found in ECR"
+                            exit 1
+                        fi
+
+                        echo "PASS: $repository:${IMAGE_TAG}"
+                    done
+
+                    echo "All ECR images verified."
+                '''
+            }
+        }
+
+        stage("Update Kubernetes Image Tags") {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "======================================"
+                    echo "Updating Kubernetes image tags"
+                    echo "New tag: ${IMAGE_TAG}"
+                    echo "======================================"
+
+                    find "${K8S_DIR}" -type f \
+                      \\( -name "*.yaml" -o -name "*.yml" \\) \
+                      -print0 |
+                    xargs -0 sed -i -E \
+                      "s|(586197446523\\.dkr\\.ecr\\.ap-south-1\\.amazonaws\\.com/[^:[:space:]]+):[^[:space:]]+|\\1:${IMAGE_TAG}|g"
+
+                    echo ""
+                    echo "Updated ECR images:"
+                    grep -Rni \
+                      "586197446523.dkr.ecr.ap-south-1.amazonaws.com" \
+                      "${K8S_DIR}"
+                '''
+            }
+        }
+
+        stage("Validate Changes") {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "Checking YAML files..."
+
+                    git diff --check
+
+                    echo ""
+                    echo "Git changes:"
+                    git diff -- "${K8S_DIR}"
+
+                    echo ""
+                    echo "Validating Kubernetes manifests..."
+
+                    kubectl apply \
+                      --dry-run=client \
+                      -f "${K8S_DIR}"
+
+                    echo ""
+                    echo "Kubernetes manifests are valid."
+                '''
+            }
+        }
+
+        stage("Commit and Push") {
+            steps {
+                sh '''
+                    set -e
+
+                    if git diff --quiet -- "${K8S_DIR}"; then
+                        echo "No Kubernetes image changes detected."
+                        exit 0
+                    fi
+
+                    git config user.name "Jenkins"
+                    git config user.email "jenkins@localhost"
+
+                    git add "${K8S_DIR}"
+
+                    git commit \
+                      -m "chore: deploy ${IMAGE_TAG}"
+
+                    git push origin HEAD:main
+
+                    echo "Kubernetes changes pushed to GitHub."
+                '''
+            }
+        }
+    }
+
+    post {
+
+        success {
+            echo "CD pipeline completed successfully."
+            echo "Image tag ${IMAGE_TAG} is now committed to Kubernetes manifests."
+            echo "Argo CD should detect the Git change and deploy it."
+        }
+
+        failure {
+            echo "CD pipeline failed."
+            echo "Check the failed stage and Jenkins console logs."
+        }
+
+        always {
+            echo "CD pipeline finished."
+        }
+    }
+}
