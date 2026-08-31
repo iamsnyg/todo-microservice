@@ -2,113 +2,336 @@ pipeline {
     agent any
 
     parameters {
+
+        string(
+            name: 'SERVICE_NAME',
+            defaultValue: '',
+            description: 'Service changed by CI'
+        )
+
         string(
             name: 'IMAGE_TAG',
-            defaultValue: '1.0.0',
-            description: 'Docker image tag produced by CI'
+            defaultValue: '',
+            description: 'Verified Docker image tag produced by CI'
         )
     }
 
     environment {
-        AWS_REGION = "ap-south-1"
+
+        AWS_REGION     = "ap-south-1"
         AWS_ACCOUNT_ID = "586197446523"
-        ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
+        ECR_REGISTRY =
+            "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+
         K8S_DIR = "devops/kubernetes"
+
+        // Replace with your actual GitHub repository
+        GITHUB_REPO = "YOUR_USERNAME/YOUR_REPOSITORY"
     }
 
     stages {
 
+        // ==========================================================
+        // 1. VALIDATE PARAMETERS
+        // ==========================================================
+
+        stage("Validate Parameters") {
+            steps {
+                script {
+
+                    echo "======================================"
+                    echo "CD PARAMETERS"
+                    echo "======================================"
+
+                    echo "SERVICE_NAME: ${params.SERVICE_NAME}"
+                    echo "IMAGE_TAG   : ${params.IMAGE_TAG}"
+
+                    def allowedServices = [
+                        "auth-service",
+                        "todo-service",
+                        "notification-service",
+                        "gateway",
+                        "frontend"
+                    ]
+
+                    if (!allowedServices.contains(params.SERVICE_NAME)) {
+                        error(
+                            "Invalid SERVICE_NAME: ${params.SERVICE_NAME}"
+                        )
+                    }
+
+                    if (!(params.IMAGE_TAG ==~ /^[0-9]+\.[0-9]+\.[0-9]+$/)) {
+                        error(
+                            "Invalid IMAGE_TAG: ${params.IMAGE_TAG}"
+                        )
+                    }
+
+                    echo ""
+                    echo "Parameters are valid."
+                }
+            }
+        }
+
+
+        // ==========================================================
+        // 2. CHECKOUT
+        // ==========================================================
+
         stage("Checkout") {
             steps {
+
                 checkout scm
-            }
-        }
 
-        stage("Verify ECR Images") {
-            steps {
                 sh '''
                     set -e
 
                     echo "======================================"
-                    echo "Verifying ECR images"
-                    echo "Tag: ${IMAGE_TAG}"
+                    echo "CHECKOUT"
                     echo "======================================"
 
-                    repositories="
-                    todo-auth-service
-                    todo-auth-service-migration
-                    todo-service
-                    todo-service-migration
-                    todo-notification-service
-                    todo-notification-service-migration
-                    todo-gateway
-                    todo-frontend
-                    "
+                    git status
 
-                    for repository in $repositories; do
-
-                        echo "Checking $repository:${IMAGE_TAG}"
-
-                        digest=$(aws ecr describe-images \
-                          --repository-name "$repository" \
-                          --region "${AWS_REGION}" \
-                          --image-ids imageTag="${IMAGE_TAG}" \
-                          --query 'imageDetails[0].imageDigest' \
-                          --output text)
-
-                        if [ -z "$digest" ] || [ "$digest" = "None" ]; then
-                            echo "ERROR: $repository:${IMAGE_TAG} not found in ECR"
-                            exit 1
-                        fi
-
-                        echo "PASS: $repository:${IMAGE_TAG}"
-                    done
-
-                    echo "All ECR images verified."
+                    echo ""
+                    echo "Current commit:"
+                    git log -1 --oneline
                 '''
             }
         }
 
-        stage("Update Kubernetes Image Tags") {
+
+        // ==========================================================
+        // 3. VERIFY ECR IMAGE
+        // ==========================================================
+
+        stage("Verify ECR Image") {
             steps {
-                sh '''
-                    set -e
+                script {
+
+                    def repositories = []
+
+                    if (params.SERVICE_NAME == "auth-service") {
+
+                        repositories = [
+                            "todo-auth-service",
+                            "todo-auth-service-migration"
+                        ]
+
+                    } else if (params.SERVICE_NAME == "todo-service") {
+
+                        repositories = [
+                            "todo-service",
+                            "todo-service-migration"
+                        ]
+
+                    } else if (params.SERVICE_NAME == "notification-service") {
+
+                        repositories = [
+                            "todo-notification-service",
+                            "todo-notification-service-migration"
+                        ]
+
+                    } else if (params.SERVICE_NAME == "gateway") {
+
+                        repositories = [
+                            "todo-gateway"
+                        ]
+
+                    } else if (params.SERVICE_NAME == "frontend") {
+
+                        repositories = [
+                            "todo-frontend"
+                        ]
+                    }
 
                     echo "======================================"
-                    echo "Updating Kubernetes image tags"
-                    echo "New tag: ${IMAGE_TAG}"
+                    echo "VERIFYING ECR"
                     echo "======================================"
 
-                    find "${K8S_DIR}" -type f \
-                      \\( -name "*.yaml" -o -name "*.yml" \\) \
-                      -print0 |
-                    xargs -0 sed -i -E \
-                      "s|(586197446523\\.dkr\\.ecr\\.ap-south-1\\.amazonaws\\.com/[^:[:space:]]+):[^[:space:]]+|\\1:${IMAGE_TAG}|g"
+                    echo "Service: ${params.SERVICE_NAME}"
+                    echo "Tag    : ${params.IMAGE_TAG}"
+
+                    for (repository in repositories) {
+
+                        sh """
+                            set -e
+
+                            echo ""
+                            echo "Checking ${repository}:${params.IMAGE_TAG}"
+
+                            digest=\$(aws ecr describe-images \
+                              --repository-name "${repository}" \
+                              --region "${AWS_REGION}" \
+                              --image-ids imageTag="${params.IMAGE_TAG}" \
+                              --query 'imageDetails[0].imageDigest' \
+                              --output text)
+
+                            if [ -z "\$digest" ] || [ "\$digest" = "None" ]; then
+
+                                echo "ERROR: ${repository}:${params.IMAGE_TAG} not found in ECR."
+
+                                exit 1
+                            fi
+
+                            echo "PASS: ${repository}:${params.IMAGE_TAG}"
+                            echo "Digest: \$digest"
+                        """
+                    }
 
                     echo ""
-                    echo "Updated ECR images:"
-                    grep -Rni \
-                      "586197446523.dkr.ecr.ap-south-1.amazonaws.com" \
-                      "${K8S_DIR}"
-                '''
+                    echo "ECR verification successful."
+                }
             }
         }
 
-        stage("Validate Changes") {
+
+        // ==========================================================
+        // 4. UPDATE KUBERNETES IMAGE
+        // ==========================================================
+
+        stage("Update Kubernetes Image") {
             steps {
+                script {
+
+                    echo "======================================"
+                    echo "UPDATING KUBERNETES"
+                    echo "======================================"
+
+                    echo "Service: ${params.SERVICE_NAME}"
+                    echo "New tag: ${params.IMAGE_TAG}"
+
+                    def imageRepository = ""
+
+                    if (params.SERVICE_NAME == "auth-service") {
+
+                        imageRepository = "todo-auth-service"
+
+                    } else if (params.SERVICE_NAME == "todo-service") {
+
+                        imageRepository = "todo-service"
+
+                    } else if (params.SERVICE_NAME == "notification-service") {
+
+                        imageRepository = "todo-notification-service"
+
+                    } else if (params.SERVICE_NAME == "gateway") {
+
+                        imageRepository = "todo-gateway"
+
+                    } else if (params.SERVICE_NAME == "frontend") {
+
+                        imageRepository = "todo-frontend"
+                    }
+
+                    def fullImage =
+                        "${ECR_REGISTRY}/${imageRepository}:${params.IMAGE_TAG}"
+
+                    echo ""
+                    echo "Target image:"
+                    echo fullImage
+
+                    sh """
+                        set -e
+
+                        echo ""
+                        echo "Existing image references:"
+
+                        grep -Rni \
+                          "${ECR_REGISTRY}/${imageRepository}" \
+                          "${K8S_DIR}" || true
+
+                        echo ""
+                        echo "Updating image..."
+
+                        find "${K8S_DIR}" -type f \
+                          \\( -name "*.yaml" -o -name "*.yml" \\) \
+                          -print0 |
+                        xargs -0 sed -i -E \
+                          "s|(${ECR_REGISTRY}/${imageRepository}):[^[:space:]\\\"']+|\\1:${params.IMAGE_TAG}|g"
+
+                        echo ""
+                        echo "Main image updated."
+                    """
+
+
+                    // --------------------------------------------------
+                    // Migration image
+                    // --------------------------------------------------
+
+                    if (
+                        params.SERVICE_NAME == "auth-service" ||
+                        params.SERVICE_NAME == "todo-service" ||
+                        params.SERVICE_NAME == "notification-service"
+                    ) {
+
+                        def migrationRepository =
+                            "${imageRepository}-migration"
+
+                        sh """
+                            set -e
+
+                            echo ""
+                            echo "Updating migration image..."
+
+                            find "${K8S_DIR}" -type f \
+                              \\( -name "*.yaml" -o -name "*.yml" \\) \
+                              -print0 |
+                            xargs -0 sed -i -E \
+                              "s|(${ECR_REGISTRY}/${migrationRepository}):[^[:space:]\\\"']+|\\1:${params.IMAGE_TAG}|g"
+
+                            echo "Migration image updated."
+                        """
+                    }
+
+                    echo ""
+                    echo "Kubernetes image update completed."
+                }
+            }
+        }
+
+
+        // ==========================================================
+        // 5. SHOW MANIFEST CHANGES
+        // ==========================================================
+
+        stage("Verify Manifest Changes") {
+            steps {
+
                 sh '''
                     set -e
 
-                    echo "Checking YAML files..."
+                    echo "======================================"
+                    echo "KUBERNETES CHANGES"
+                    echo "======================================"
 
-                    git diff --check
-
-                    echo ""
-                    echo "Git changes:"
                     git diff -- "${K8S_DIR}"
 
                     echo ""
-                    echo "Validating Kubernetes manifests..."
+                    echo "Updated ECR references:"
+
+                    grep -Rni \
+                      "${ECR_REGISTRY}" \
+                      "${K8S_DIR}" || true
+                '''
+            }
+        }
+
+
+        // ==========================================================
+        // 6. VALIDATE KUBERNETES MANIFESTS
+        // ==========================================================
+
+        stage("Validate Kubernetes Manifests") {
+            steps {
+
+                sh '''
+                    set -e
+
+                    echo "======================================"
+                    echo "VALIDATING KUBERNETES"
+                    echo "======================================"
+
+                    git diff --check
 
                     kubectl apply \
                       --dry-run=client \
@@ -120,46 +343,134 @@ pipeline {
             }
         }
 
-        stage("Commit and Push") {
+
+        // ==========================================================
+        // 7. CHECK CHANGES
+        // ==========================================================
+
+        stage("Check Changes") {
             steps {
+
                 sh '''
                     set -e
 
+                    echo "======================================"
+                    echo "CHECKING GIT CHANGES"
+                    echo "======================================"
+
                     if git diff --quiet -- "${K8S_DIR}"; then
-                        echo "No Kubernetes image changes detected."
-                        exit 0
+
+                        echo ""
+                        echo "No Kubernetes changes detected."
+
+                        exit 1
                     fi
 
-                    git config user.name "Jenkins"
-                    git config user.email "jenkins@localhost"
-
-                    git add "${K8S_DIR}"
-
-                    git commit \
-                      -m "chore: deploy ${IMAGE_TAG}"
-
-                    git push origin HEAD:main
-
-                    echo "Kubernetes changes pushed to GitHub."
+                    echo ""
+                    echo "Kubernetes changes detected."
                 '''
+            }
+        }
+
+
+        // ==========================================================
+        // 8. COMMIT AND PUSH
+        // ==========================================================
+
+        stage("Commit and Push") {
+            steps {
+
+                withCredentials([
+                    string(
+                        credentialsId: 'github-token',
+                        variable: 'GITHUB_TOKEN'
+                    )
+                ]) {
+
+                    sh '''
+                        set -e
+
+                        echo "======================================"
+                        echo "COMMITTING KUBERNETES CHANGE"
+                        echo "======================================"
+
+                        git config user.name "Jenkins CD"
+                        git config user.email "jenkins-cd@localhost"
+
+                        git add "${K8S_DIR}"
+
+                        git commit \
+                          -m "chore: deploy ${SERVICE_NAME} ${IMAGE_TAG}"
+
+                        git push \
+                          "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git" \
+                          HEAD:main
+
+                        echo ""
+                        echo "Kubernetes changes pushed to GitHub."
+                    '''
+                }
             }
         }
     }
 
+
+    // ==============================================================
+    // POST
+    // ==============================================================
+
     post {
 
         success {
-            echo "CD pipeline completed successfully."
-            echo "Image tag ${IMAGE_TAG} is now committed to Kubernetes manifests."
-            echo "Argo CD should detect the Git change and deploy it."
+
+            echo ""
+            echo "======================================"
+            echo "CD PIPELINE SUCCESS"
+            echo "======================================"
+
+            echo ""
+            echo "Service : ${params.SERVICE_NAME}"
+            echo "Version : ${params.IMAGE_TAG}"
+
+            echo ""
+            echo "Completed:"
+            echo "- Parameters verified"
+            echo "- ECR image verified"
+            echo "- Kubernetes image updated"
+            echo "- Manifest validated"
+            echo "- Changes committed"
+            echo "- Changes pushed to GitHub"
+
+            echo ""
+            echo "Argo CD should now detect the Git change."
+
+            echo ""
+            echo "======================================"
         }
+
 
         failure {
-            echo "CD pipeline failed."
-            echo "Check the failed stage and Jenkins console logs."
+
+            echo ""
+            echo "======================================"
+            echo "CD PIPELINE FAILED"
+            echo "======================================"
+
+            echo ""
+            echo "Service : ${params.SERVICE_NAME}"
+            echo "Version : ${params.IMAGE_TAG}"
+
+            echo ""
+            echo "Check the failed Jenkins stage."
+
+            echo ""
+            echo "======================================"
         }
 
+
         always {
+
+            echo ""
             echo "CD pipeline finished."
         }
     }
