@@ -1,14 +1,28 @@
 pipeline {
     agent any
 
+    parameters {
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '1.0.0',
+            description: 'Docker image tag to build, scan, push and deploy'
+        )
+    }
+
     environment {
         AWS_REGION = "ap-south-1"
         AWS_ACCOUNT_ID = "586197446523"
         ECR_REGISTRY = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-        IMAGE_TAG = "1.0.0"
+
+        // Jenkins CD job name
+        CD_JOB_NAME = "todo-app-cd"
     }
 
     stages {
+
+        // ==========================================================
+        // CHECKOUT
+        // ==========================================================
 
         stage("Checkout") {
             steps {
@@ -16,12 +30,47 @@ pipeline {
             }
         }
 
+
+        // ==========================================================
+        // VALIDATE IMAGE TAG
+        // ==========================================================
+
+        stage("Validate Image Tag") {
+            steps {
+                sh '''
+                    set -e
+
+                    echo "======================================"
+                    echo "Validating Image Tag"
+                    echo "======================================"
+
+                    echo "IMAGE_TAG=${IMAGE_TAG}"
+
+                    if ! echo "${IMAGE_TAG}" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+$'; then
+                        echo "ERROR: Invalid image tag: ${IMAGE_TAG}"
+                        echo "Expected format: X.Y.Z"
+                        echo "Examples: 1.0.0, 1.0.1, 1.1.0"
+                        exit 1
+                    fi
+
+                    echo "Image tag is valid."
+                '''
+            }
+        }
+
+
+        // ==========================================================
+        // VERIFY PROJECT
+        // ==========================================================
+
         stage("Verify Project") {
             steps {
                 sh '''
                     set -e
 
-                    echo "Checking project structure..."
+                    echo "======================================"
+                    echo "Checking Project Structure"
+                    echo "======================================"
 
                     test -d auth-service
                     test -d todo-service
@@ -34,23 +83,35 @@ pipeline {
             }
         }
 
+
+        // ==========================================================
+        // LOGIN TO ECR
+        // ==========================================================
+
         stage("Login to ECR") {
             steps {
                 sh '''
                     set -e
 
-                    echo "Logging in to Amazon ECR..."
+                    echo "======================================"
+                    echo "Logging in to Amazon ECR"
+                    echo "======================================"
 
                     aws ecr get-login-password \
-                      --region ${AWS_REGION} | \
+                      --region "${AWS_REGION}" | \
                     docker login \
                       --username AWS \
-                      --password-stdin ${ECR_REGISTRY}
+                      --password-stdin "${ECR_REGISTRY}"
 
                     echo "ECR login successful."
                 '''
             }
         }
+
+
+        // ==========================================================
+        // BUILD IMAGES
+        // ==========================================================
 
         stage("Build Docker Images") {
             steps {
@@ -62,9 +123,9 @@ pipeline {
                     echo "Image tag: ${IMAGE_TAG}"
                     echo "======================================"
 
-                    # ==========================================
+                    # ==================================================
                     # AUTH SERVICE - PRODUCTION
-                    # ==========================================
+                    # ==================================================
 
                     echo "Building Auth production image..."
 
@@ -74,9 +135,9 @@ pipeline {
                       ./auth-service
 
 
-                    # ==========================================
+                    # ==================================================
                     # AUTH SERVICE - MIGRATION
-                    # ==========================================
+                    # ==================================================
 
                     echo "Building Auth migration image..."
 
@@ -86,9 +147,9 @@ pipeline {
                       ./auth-service
 
 
-                    # ==========================================
+                    # ==================================================
                     # TODO SERVICE - PRODUCTION
-                    # ==========================================
+                    # ==================================================
 
                     echo "Building Todo production image..."
 
@@ -98,9 +159,9 @@ pipeline {
                       ./todo-service
 
 
-                    # ==========================================
+                    # ==================================================
                     # TODO SERVICE - MIGRATION
-                    # ==========================================
+                    # ==================================================
 
                     echo "Building Todo migration image..."
 
@@ -110,9 +171,9 @@ pipeline {
                       ./todo-service
 
 
-                    # ==========================================
+                    # ==================================================
                     # NOTIFICATION SERVICE - PRODUCTION
-                    # ==========================================
+                    # ==================================================
 
                     echo "Building Notification production image..."
 
@@ -122,9 +183,9 @@ pipeline {
                       ./notification-service
 
 
-                    # ==========================================
+                    # ==================================================
                     # NOTIFICATION SERVICE - MIGRATION
-                    # ==========================================
+                    # ==================================================
 
                     echo "Building Notification migration image..."
 
@@ -134,22 +195,22 @@ pipeline {
                       ./notification-service
 
 
-                    # ==========================================
-                    # GATEWAY - PRODUCTION
-                    # ==========================================
+                    # ==================================================
+                    # GATEWAY
+                    # ==================================================
 
-                    echo "Building Gateway production image..."
+                    echo "Building Gateway image..."
 
                     docker build \
                       -t ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG} \
                       ./gateway
 
 
-                    # ==========================================
-                    # FRONTEND - PRODUCTION
-                    # ==========================================
+                    # ==================================================
+                    # FRONTEND
+                    # ==================================================
 
-                    echo "Building Frontend production image..."
+                    echo "Building Frontend image..."
 
                     docker build \
                       -t ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG} \
@@ -158,12 +219,17 @@ pipeline {
 
                     echo ""
                     echo "======================================"
-                    echo "All production and migration images"
-                    echo "built successfully."
+                    echo "All images built successfully."
+                    echo "Tag: ${IMAGE_TAG}"
                     echo "======================================"
                 '''
             }
         }
+
+
+        // ==========================================================
+        // SHOW DOCKER IMAGES
+        // ==========================================================
 
         stage("Docker Images") {
             steps {
@@ -172,43 +238,28 @@ pipeline {
 
                     echo "======================================"
                     echo "Docker Images"
-                    echo "Image tag: ${IMAGE_TAG}"
+                    echo "Tag: ${IMAGE_TAG}"
                     echo "======================================"
 
-                    echo ""
-                    echo "===== Auth Service ====="
                     docker images ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
-
-                    echo ""
-                    echo "===== Auth Migration ====="
                     docker images ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
 
-                    echo ""
-                    echo "===== Todo Service ====="
                     docker images ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
-
-                    echo ""
-                    echo "===== Todo Migration ====="
                     docker images ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
 
-                    echo ""
-                    echo "===== Notification Service ====="
                     docker images ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
-
-                    echo ""
-                    echo "===== Notification Migration ====="
                     docker images ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
 
-                    echo ""
-                    echo "===== Gateway ====="
                     docker images ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
-
-                    echo ""
-                    echo "===== Frontend ====="
                     docker images ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
                 '''
             }
         }
+
+
+        // ==========================================================
+        // TRIVY SECURITY SCAN
+        // ==========================================================
 
         stage("Trivy Security Scan") {
             steps {
@@ -217,11 +268,11 @@ pipeline {
 
                     echo "======================================"
                     echo "Starting Trivy Security Scan"
-                    echo "Image tag: ${IMAGE_TAG}"
+                    echo "Tag: ${IMAGE_TAG}"
                     echo "======================================"
 
-                    echo ""
-                    echo "===== Auth Service ====="
+
+                    echo "Scanning Auth production..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -230,8 +281,7 @@ pipeline {
                       ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "===== Auth Migration ====="
+                    echo "Scanning Auth migration..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -240,8 +290,7 @@ pipeline {
                       ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "===== Todo Service ====="
+                    echo "Scanning Todo production..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -250,8 +299,7 @@ pipeline {
                       ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "===== Todo Migration ====="
+                    echo "Scanning Todo migration..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -260,8 +308,7 @@ pipeline {
                       ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "===== Notification Service ====="
+                    echo "Scanning Notification production..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -270,8 +317,7 @@ pipeline {
                       ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "===== Notification Migration ====="
+                    echo "Scanning Notification migration..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -280,8 +326,7 @@ pipeline {
                       ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "===== Gateway ====="
+                    echo "Scanning Gateway..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -290,8 +335,7 @@ pipeline {
                       ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "===== Frontend ====="
+                    echo "Scanning Frontend..."
 
                     trivy image \
                       --severity CRITICAL \
@@ -309,6 +353,11 @@ pipeline {
             }
         }
 
+
+        // ==========================================================
+        // PUSH IMAGES TO ECR
+        // ==========================================================
+
         stage("Push Images to ECR") {
             steps {
                 sh '''
@@ -316,60 +365,37 @@ pipeline {
 
                     echo "======================================"
                     echo "Pushing Images to Amazon ECR"
-                    echo "Image tag: ${IMAGE_TAG}"
+                    echo "Tag: ${IMAGE_TAG}"
                     echo "======================================"
 
-                    echo ""
-                    echo "Pushing Auth production..."
 
                     docker push \
                       ${ECR_REGISTRY}/todo-auth-service:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "Pushing Auth migration..."
-
                     docker push \
                       ${ECR_REGISTRY}/todo-auth-service-migration:${IMAGE_TAG}
 
-
-                    echo ""
-                    echo "Pushing Todo production..."
 
                     docker push \
                       ${ECR_REGISTRY}/todo-service:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "Pushing Todo migration..."
-
                     docker push \
                       ${ECR_REGISTRY}/todo-service-migration:${IMAGE_TAG}
 
-
-                    echo ""
-                    echo "Pushing Notification production..."
 
                     docker push \
                       ${ECR_REGISTRY}/todo-notification-service:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "Pushing Notification migration..."
-
                     docker push \
                       ${ECR_REGISTRY}/todo-notification-service-migration:${IMAGE_TAG}
 
 
-                    echo ""
-                    echo "Pushing Gateway..."
-
                     docker push \
                       ${ECR_REGISTRY}/todo-gateway:${IMAGE_TAG}
 
-
-                    echo ""
-                    echo "Pushing Frontend..."
 
                     docker push \
                       ${ECR_REGISTRY}/todo-frontend:${IMAGE_TAG}
@@ -377,12 +403,16 @@ pipeline {
 
                     echo ""
                     echo "======================================"
-                    echo "All production and migration images"
-                    echo "pushed successfully to ECR."
+                    echo "All images pushed successfully."
                     echo "======================================"
                 '''
             }
         }
+
+
+        // ==========================================================
+        // VERIFY ECR
+        // ==========================================================
 
         stage("Verify ECR Images") {
             steps {
@@ -391,8 +421,9 @@ pipeline {
 
                     echo "======================================"
                     echo "Verifying ECR Images"
-                    echo "Image tag: ${IMAGE_TAG}"
+                    echo "Tag: ${IMAGE_TAG}"
                     echo "======================================"
+
 
                     repositories="
                     todo-auth-service
@@ -405,10 +436,12 @@ pipeline {
                     todo-frontend
                     "
 
+
                     for repository in $repositories; do
 
                         echo ""
-                        echo "Checking: $repository:${IMAGE_TAG}"
+                        echo "Checking: ${repository}:${IMAGE_TAG}"
+
 
                         digest=$(aws ecr describe-images \
                           --repository-name "$repository" \
@@ -417,17 +450,20 @@ pipeline {
                           --query 'imageDetails[0].imageDigest' \
                           --output text)
 
+
                         if [ -z "$digest" ] || [ "$digest" = "None" ]; then
 
-                            echo "ERROR: Image tag ${IMAGE_TAG} not found in $repository"
+                            echo "ERROR: Image ${repository}:${IMAGE_TAG} not found in ECR."
 
                             exit 1
                         fi
 
-                        echo "PASS: $repository:${IMAGE_TAG}"
-                        echo "Digest: $digest"
+
+                        echo "PASS: ${repository}:${IMAGE_TAG}"
+                        echo "Digest: ${digest}"
 
                     done
+
 
                     echo ""
                     echo "======================================"
@@ -436,22 +472,82 @@ pipeline {
                 '''
             }
         }
+
+
+        // ==========================================================
+        // TRIGGER CD
+        // ==========================================================
+
+        stage("Trigger CD") {
+            steps {
+                script {
+
+                    echo "======================================"
+                    echo "Triggering CD Pipeline"
+                    echo "======================================"
+
+                    echo "CD Job: ${CD_JOB_NAME}"
+                    echo "IMAGE_TAG: ${IMAGE_TAG}"
+
+                    build job: "${CD_JOB_NAME}",
+                        parameters: [
+                            string(
+                                name: 'IMAGE_TAG',
+                                value: "${IMAGE_TAG}"
+                            )
+                        ],
+                        wait: false,
+                        propagate: true
+
+                    echo "CD pipeline triggered successfully."
+                }
+            }
+        }
     }
+
+
+    // ==============================================================
+    // POST
+    // ==============================================================
 
     post {
 
         success {
-            echo "CI pipeline completed successfully."
-            echo "All production and migration images passed Trivy security scanning."
-            echo "All images were pushed and verified in ECR."
+            echo ""
+            echo "======================================"
+            echo "CI PIPELINE SUCCESS"
+            echo "======================================"
+            echo ""
+            echo "Image tag: ${IMAGE_TAG}"
+            echo ""
+            echo "All images:"
+            echo "- Built"
+            echo "- Security scanned"
+            echo "- Pushed to ECR"
+            echo "- Verified in ECR"
+            echo ""
+            echo "CD pipeline has been triggered."
+            echo "======================================"
         }
+
 
         failure {
-            echo "CI pipeline failed."
-            echo "Check the failed stage and Jenkins console logs."
+            echo ""
+            echo "======================================"
+            echo "CI PIPELINE FAILED"
+            echo "======================================"
+            echo ""
+            echo "Image tag: ${IMAGE_TAG}"
+            echo ""
+            echo "CD pipeline will NOT be triggered."
+            echo ""
+            echo "Check the failed Jenkins stage."
+            echo "======================================"
         }
 
+
         always {
+            echo ""
             echo "CI pipeline finished."
         }
     }
