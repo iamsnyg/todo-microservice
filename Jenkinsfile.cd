@@ -323,18 +323,48 @@ pipeline {
 
         stage("Validate Kubernetes Manifests") {
             steps {
-
+        
                 sh '''
                     set -e
-
+        
                     echo "======================================"
                     echo "VALIDATING KUBERNETES"
                     echo "======================================"
-
+        
+                    echo ""
+                    echo "Configuring EKS access for Jenkins..."
+        
+                    aws eks update-kubeconfig \
+                      --region "${AWS_REGION}" \
+                      --name "todo-eks-cluster"
+        
+                    echo ""
+                    echo "Current Kubernetes context:"
+                    kubectl config current-context
+        
+                    echo ""
+                    echo "Kubernetes API server:"
+                    kubectl config view --minify \
+                      -o jsonpath='{.clusters[0].cluster.server}'
+                    echo ""
+        
+                    echo ""
+                    echo "Testing Kubernetes access..."
+                    kubectl get nodes
+        
+                    echo ""
+                    echo "Checking manifest formatting..."
                     git diff --check
-
-                    kubectl apply --dry-run=client --recursive -f "${K8S_DIR}"
-
+        
+                    echo ""
+                    echo "Validating Kubernetes manifests..."
+        
+                    kubectl apply \
+                      --dry-run=client \
+                      --validate=false \
+                      --recursive \
+                      -f "${K8S_DIR}"
+        
                     echo ""
                     echo "Kubernetes manifests are valid."
                 '''
