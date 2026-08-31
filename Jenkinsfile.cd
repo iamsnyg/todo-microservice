@@ -333,10 +333,7 @@ pipeline {
 
                     git diff --check
 
-                    kubectl apply \
-                      --dry-run=client \
-		      --recursive \ 
-                      -f "${K8S_DIR}"
+                    kubectl apply --dry-run=client --recursive -f "${K8S_DIR}"
 
                     echo ""
                     echo "Kubernetes manifests are valid."
