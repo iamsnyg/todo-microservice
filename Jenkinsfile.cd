@@ -27,7 +27,7 @@ pipeline {
         K8S_DIR = "devops/kubernetes"
 
         // Replace with your actual GitHub repository
-        GITHUB_REPO = "YOUR_USERNAME/YOUR_REPOSITORY"
+        GITHUB_REPO = "iamsnyg/todo-microservice"
     }
 
     stages {
@@ -335,6 +335,7 @@ pipeline {
 
                     kubectl apply \
                       --dry-run=client \
+		      --recursive \ 
                       -f "${K8S_DIR}"
 
                     echo ""
@@ -382,7 +383,7 @@ pipeline {
 
                 withCredentials([
                     string(
-                        credentialsId: 'github-token',
+                        credentialsId: 'github-credentials',
                         variable: 'GITHUB_TOKEN'
                     )
                 ]) {
