@@ -381,25 +381,31 @@ pipeline {
 
         stage("Check Changes") {
             steps {
-
-                sh '''
-                    set -e
-
+                script {
                     echo "======================================"
                     echo "CHECKING GIT CHANGES"
                     echo "======================================"
-
-                    if git diff --quiet -- "${K8S_DIR}"; then
-
+        
+                    if (sh(
+                        script: "git diff --quiet -- '${K8S_DIR}'",
+                        returnStatus: true
+                    ) == 0) {
+        
                         echo ""
                         echo "No Kubernetes changes detected."
-
-                        exit 1
-                    fi
-
-                    echo ""
-                    echo "Kubernetes changes detected."
-                '''
+                        echo "The requested image tag is already configured."
+                        echo "Nothing to commit or push."
+        
+                        env.K8S_CHANGES = "false"
+        
+                    } else {
+        
+                        echo ""
+                        echo "Kubernetes changes detected."
+        
+                        env.K8S_CHANGES = "true"
+                    }
+                }
             }
         }
 
@@ -409,41 +415,44 @@ pipeline {
         // ==========================================================
 
         stage("Commit and Push") {
+            when {
+                expression {
+                    return env.K8S_CHANGES == "true"
+                }
+            }
+        
             steps {
-
                 withCredentials([
                     string(
                         credentialsId: 'github-credentials',
                         variable: 'GITHUB_TOKEN'
                     )
                 ]) {
-
                     sh '''
                         set -e
-
+        
                         echo "======================================"
                         echo "COMMITTING KUBERNETES CHANGE"
                         echo "======================================"
-
+        
                         git config user.name "Jenkins CD"
                         git config user.email "jenkins-cd@localhost"
-
+        
                         git add "${K8S_DIR}"
-
+        
                         git commit \
                           -m "chore: deploy ${SERVICE_NAME} ${IMAGE_TAG}"
-
+        
                         git push \
                           "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPO}.git" \
                           HEAD:main
-
+        
                         echo ""
                         echo "Kubernetes changes pushed to GitHub."
                     '''
                 }
             }
         }
-    }
 
 
     // ==============================================================
