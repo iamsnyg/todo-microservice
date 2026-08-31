@@ -1057,7 +1057,7 @@ pipeline {
 
                 withCredentials([
                     string(
-                        credentialsId: 'github-token',
+                        credentialsId: 'github-cred',
                         variable: 'GITHUB_TOKEN'
                     )
                 ]) {
