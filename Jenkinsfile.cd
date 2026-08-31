@@ -26,7 +26,6 @@ pipeline {
 
         K8S_DIR = "devops/kubernetes"
 
-        // Replace with your actual GitHub repository
         GITHUB_REPO = "iamsnyg/todo-microservice"
     }
 
@@ -159,14 +158,14 @@ pipeline {
                             echo ""
                             echo "Checking ${repository}:${params.IMAGE_TAG}"
 
-                            digest=\$(aws ecr describe-images \
+                            digest=\\$(aws ecr describe-images \
                               --repository-name "${repository}" \
                               --region "${AWS_REGION}" \
                               --image-ids imageTag="${params.IMAGE_TAG}" \
                               --query 'imageDetails[0].imageDigest' \
                               --output text)
 
-                            if [ -z "\$digest" ] || [ "\$digest" = "None" ]; then
+                            if [ -z "\\$digest" ] || [ "\\$digest" = "None" ]; then
 
                                 echo "ERROR: ${repository}:${params.IMAGE_TAG} not found in ECR."
 
@@ -174,7 +173,7 @@ pipeline {
                             fi
 
                             echo "PASS: ${repository}:${params.IMAGE_TAG}"
-                            echo "Digest: \$digest"
+                            echo "Digest: \\$digest"
                         """
                     }
 
@@ -247,7 +246,7 @@ pipeline {
                           \\( -name "*.yaml" -o -name "*.yml" \\) \
                           -print0 |
                         xargs -0 sed -i -E \
-                          "s|(${ECR_REGISTRY}/${imageRepository}):[^[:space:]\\\"']+|\\1:${params.IMAGE_TAG}|g"
+                          "s|(${ECR_REGISTRY}/${imageRepository}):[^[:space:]\\\\\\"']+|\\1:${params.IMAGE_TAG}|g"
 
                         echo ""
                         echo "Main image updated."
@@ -277,7 +276,7 @@ pipeline {
                               \\( -name "*.yaml" -o -name "*.yml" \\) \
                               -print0 |
                             xargs -0 sed -i -E \
-                              "s|(${ECR_REGISTRY}/${migrationRepository}):[^[:space:]\\\"']+|\\1:${params.IMAGE_TAG}|g"
+                              "s|(${ECR_REGISTRY}/${migrationRepository}):[^[:space:]\\\\\\"']+|\\1:${params.IMAGE_TAG}|g"
 
                             echo "Migration image updated."
                         """
@@ -323,48 +322,52 @@ pipeline {
 
         stage("Validate Kubernetes Manifests") {
             steps {
-        
+
                 sh '''
                     set -e
-        
+
                     echo "======================================"
                     echo "VALIDATING KUBERNETES"
                     echo "======================================"
-        
+
                     echo ""
                     echo "Configuring EKS access for Jenkins..."
-        
+
                     aws eks update-kubeconfig \
                       --region "${AWS_REGION}" \
                       --name "todo-eks-cluster"
-        
+
                     echo ""
                     echo "Current Kubernetes context:"
+
                     kubectl config current-context
-        
+
                     echo ""
                     echo "Kubernetes API server:"
+
                     kubectl config view --minify \
                       -o jsonpath='{.clusters[0].cluster.server}'
+
                     echo ""
-        
+
                     echo ""
                     echo "Testing Kubernetes access..."
+
                     kubectl get nodes
-        
+
                     echo ""
                     echo "Checking manifest formatting..."
+
                     git diff --check
-        
+
                     echo ""
                     echo "Validating Kubernetes manifests..."
-        
+
                     kubectl apply \
                       --dry-run=client \
-                      --validate=false \
                       --recursive \
                       -f "${K8S_DIR}"
-        
+
                     echo ""
                     echo "Kubernetes manifests are valid."
                 '''
