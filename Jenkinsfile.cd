@@ -158,14 +158,14 @@ pipeline {
                             echo ""
                             echo "Checking ${repository}:${params.IMAGE_TAG}"
 
-                            digest=\\$(aws ecr describe-images \
+                            digest=\$(aws ecr describe-images \
                               --repository-name "${repository}" \
                               --region "${AWS_REGION}" \
                               --image-ids imageTag="${params.IMAGE_TAG}" \
                               --query 'imageDetails[0].imageDigest' \
                               --output text)
 
-                            if [ -z "\\$digest" ] || [ "\\$digest" = "None" ]; then
+                            if [ -z "\$digest" ] || [ "\$digest" = "None" ]; then
 
                                 echo "ERROR: ${repository}:${params.IMAGE_TAG} not found in ECR."
 
@@ -173,7 +173,7 @@ pipeline {
                             fi
 
                             echo "PASS: ${repository}:${params.IMAGE_TAG}"
-                            echo "Digest: \\$digest"
+                            echo "Digest: \$digest"
                         """
                     }
 
