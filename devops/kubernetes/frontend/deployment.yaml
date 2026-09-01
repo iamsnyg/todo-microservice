@@ -37,7 +37,7 @@ spec:
       containers:
         - name: frontend
 
-          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-frontend:0.0.5
+          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-frontend:0.0.6
 
           imagePullPolicy: Always
 
