@@ -7,7 +7,9 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             <WelcomeCard />
-
+	     <button className="rounded-lg bg-orange-500 px-4 py-2 text-white hover:bg-orange-600">
+                Sunny@1234
+            </button>
             <DashboardStats />
 
             <div className="grid gap-6 lg:grid-cols-2">
