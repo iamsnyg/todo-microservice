@@ -5,6 +5,10 @@ metadata:
   name: todo-migration
   namespace: todo-app
 
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+
   labels:
     app.kubernetes.io/name: todo-migration
     app.kubernetes.io/component: migration
