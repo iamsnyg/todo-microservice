@@ -570,7 +570,7 @@ pipeline {
 
                                 docker build \
                                   --target production \
-                                  -t ${ECR_REGISTRY}/todo-notification-service:${version} \
+                                  -t ${ECR_REGISTRY}/notification-service:${version} \
                                   ./notification-service
 
                                 docker build \
@@ -679,7 +679,7 @@ pipeline {
 
                             sh """
                                 docker image inspect \
-                                  ${ECR_REGISTRY}/todo-notification-service:${version}
+                                  ${ECR_REGISTRY}/notification-service:${version}
 
                                 docker image inspect \
                                   ${ECR_REGISTRY}/todo-notification-service-migration:${version}
@@ -769,7 +769,7 @@ pipeline {
                         } else if (service == "notification-service") {
 
                             images = [
-                                "${ECR_REGISTRY}/todo-notification-service:${version}",
+                                "${ECR_REGISTRY}/notification-service:${version}",
                                 "${ECR_REGISTRY}/todo-notification-service-migration:${version}"
                             ]
 
@@ -875,7 +875,7 @@ pipeline {
                         } else if (service == "notification-service") {
 
                             repositories = [
-                                "todo-notification-service",
+                                "notification-service",
                                 "todo-notification-service-migration"
                             ]
 
@@ -978,7 +978,7 @@ pipeline {
                         } else if (service == "notification-service") {
 
                             repositories = [
-                                "todo-notification-service",
+                                "notification-service",
                                 "todo-notification-service-migration"
                             ]
 

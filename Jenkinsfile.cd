@@ -126,7 +126,7 @@ pipeline {
                     } else if (params.SERVICE_NAME == "notification-service") {
 
                         repositories = [
-                            "todo-notification-service",
+                            "notification-service",
                             "todo-notification-service-migration"
                         ]
 
@@ -211,7 +211,7 @@ pipeline {
 
                     } else if (params.SERVICE_NAME == "notification-service") {
 
-                        imageRepository = "todo-notification-service"
+                        imageRepository = "notification-service"
 
                     } else if (params.SERVICE_NAME == "gateway") {
 
