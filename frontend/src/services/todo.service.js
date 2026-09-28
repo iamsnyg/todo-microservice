@@ -27,7 +27,14 @@ export async function createTodo(data) {
 
 // Update todo
 export async function updateTodo(id, data) {
-    const response = await api.put(`/api/todos/${id}`, data);
+    const payload = {
+        ...data,
+        dueDate: data.dueDate
+            ? new Date(`${data.dueDate}T00:00:00.000Z`).toISOString()
+            : "",
+    };
+
+    const response = await api.put(`/api/todos/${id}`, payload);
     return response.data;
 }
 
