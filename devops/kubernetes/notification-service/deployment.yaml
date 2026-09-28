@@ -37,7 +37,7 @@ spec:
       containers:
         - name: notification-service
 
-          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/notification-service:0.0.1
+          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/notification-service:0.0.2
           imagePullPolicy: IfNotPresent
 
           ports:

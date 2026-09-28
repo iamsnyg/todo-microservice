@@ -54,7 +54,7 @@ spec:
       containers:
         - name: notification-migration
 
-          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-notification-service-migration:0.0.1
+          image: 586197446523.dkr.ecr.ap-south-1.amazonaws.com/todo-notification-service-migration:0.0.2
 
           imagePullPolicy: IfNotPresent
 
