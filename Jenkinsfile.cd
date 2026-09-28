@@ -263,8 +263,11 @@ pipeline {
                         params.SERVICE_NAME == "notification-service"
                     ) {
 
-                        def migrationRepository =
-                            "${imageRepository}-migration"
+                        def migrationRepository = params.SERVICE_NAME == "auth-service" ?
+                            "todo-auth-service-migration" :
+                            params.SERVICE_NAME == "todo-service" ?
+                            "todo-service-migration" :
+                            "todo-notification-service-migration"
 
                         sh """
                             set -e
