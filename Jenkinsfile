@@ -185,32 +185,16 @@ pipeline {
 
                     if (services.isEmpty()) {
 
-                        def kubernetesChanged =
-                            changedFiles
-                                .split("\\n")
-                                .any { it.startsWith("devops/kubernetes/") }
-
-                        if (kubernetesChanged) {
-
-                            echo ""
-                            echo "======================================"
-                            echo "KUBERNETES-ONLY CHANGE"
-                            echo "======================================"
-
-                            echo "No application service changes detected."
-                            echo "Docker build is not required."
-                            echo "Argo CD will synchronize the Kubernetes manifests from Git."
-
-                            currentBuild.result = "SUCCESS"
-
-                            return
-                        }
-
                         echo ""
-                        echo "No supported service changes detected."
-                        echo "CI build is not required for this commit."
+                        echo "======================================"
+                        echo "NO APPLICATION SERVICE CHANGES"
+                        echo "======================================"
 
-                        currentBuild.result = "NOT_BUILT"
+                        echo "No supported service changes detected."
+                        echo "Docker build is not required."
+                        echo "Argo CD will handle Kubernetes manifest changes automatically."
+
+                        env.NO_SERVICE_CHANGES = "true"
 
                         return
                     }
