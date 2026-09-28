@@ -35,7 +35,7 @@ export async function markAsRead(req, res, next) {
 
 export async function markAllAsRead(req, res, next) {
     try {
-        const { userId } = req.body;
+        const userId = req.headers["x-user-id"];
 
         await readAllNotifications(userId);
 
