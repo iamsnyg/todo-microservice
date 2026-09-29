@@ -43,3 +43,4 @@ export async function deleteTodo(id) {
     const response = await api.delete(`/api/todos/${id}`);
     return response.data;
 }
+// CI pipeline verification
